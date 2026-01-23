@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PDF 分割 (移动端完美适配版)</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+
+    <style>
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
+
+        /* 分割线样式 - 增加手机端触摸热区 */
+        .line-col {
+            position: absolute; top: 0; bottom: 0; width: 2px;
+            background-color: #ef4444; z-index: 30;
+            touch-action: none; /* 关键：防止拖拽时页面滚动 */
+        }
+        /* 左右扩大 15px 热区 */
+        .line-col::after { content: ''; position: absolute; left: -15px; right: -15px; top: 0; bottom: 0; }
+        .line-col.active { background-color: #b91c1c; width: 4px; margin-left: -1px; box-shadow: 0 0 10px rgba(255,0,0,0.5); }
+
+        .line-row {
+            position: absolute; left: 0; right: 0; height: 2px;
+            background-color: #3b82f6; z-index: 31;
+            touch-action: none;
+        }
+        /* 上下扩大 15px 热区 */
+        .line-row::after { content: ''; position: absolute; top: -15px; bottom: -15px; left: 0; right: 0; }
+        .line-row.active { background-color: #1d4ed8; height: 4px; margin-top: -1px; box-shadow: 0 0 10px rgba(0,0,255,0.5); }
+
+        .loading-overlay { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px); }
+        .modal-enter { animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col font-sans text-slate-800 pb-10">
+
+    <!-- 顶部导航 (移动端优化) -->
+    <header class="bg-white shadow sticky top-0 z-50">
+        <div class="container mx-auto px-4 h-14 md:h-16 flex justify-between items-center">
+            
+            <div class="flex items-center gap-2">
+                <h1 class="text-base md:text-lg font-bold text-slate-700 flex items-center gap-1 whitespace-nowrap">
+                    <span class="bg-indigo-600 text-white px-1.5 rounded text-xs py-0.5">Mobile</span>
+                    PDF分割
+                </h1>
+                
+                <!-- 外部链接 (手机端折叠为图标) -->
+                <div class="flex items-center text-gray-300 pl-2 border-l border-gray-200 ml-2 gap-3">
+                    <a href="https://www.ilovepdf.com.cn/zh-cn/" target="_blank" class="text-gray-400 hover:text-red-500">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                    </a>
+                    <a href="https://tools.pdf24.org/zh/" target="_blank" class="text-gray-400 hover:text-blue-500">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                    </a>
+                </div>
+            </div>
+
+            <!-- 右侧核心按钮 -->
+            <div class="flex items-center gap-2">
+                <button onclick="document.getElementById('add-file-input').click()" class="bg-gray-100 text-indigo-600 px-3 py-1.5 rounded-lg text-xs font-bold active:bg-gray-200">
+                    + 加文件
+                </button>
+                <input type="file" id="add-file-input" accept="application/pdf" multiple class="hidden" />
+
+                <button onclick="processAndDownload()" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg shadow text-xs font-bold active:bg-indigo-700 flex items-center gap-1">
+                    <span>下载</span>
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                </button>
+                
+                <button onclick="resetAll()" class="text-red-500 p-1.5 hover:bg-red-50 rounded">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow container mx-auto px-4 pt-4 flex flex-col items-center">
+        
+        <!-- 全局工具栏 (手机端优化：放在内容区顶部，而不是挤在Header) -->
+        <div id="global-toolbar" class="hidden w-full max-w-5xl mb-4 p-3 bg-white rounded-lg shadow-sm border border-gray-100 flex-wrap justify-between items-center gap-3">
+            <div class="flex items-center gap-2 text-sm text-gray-600 font-bold">
+                <span class="text-indigo-500">⚡ 批量设置</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="flex items-center border rounded bg-gray-50">
+                    <span class="px-2 text-xs text-red-500 font-bold">竖</span>
+                    <input type="number" id="global-col" value="1" min="1" class="w-10 py-1 bg-transparent text-center text-sm outline-none">
+                </div>
+                <div class="flex items-center border rounded bg-gray-50">
+                    <span class="px-2 text-xs text-blue-500 font-bold">横</span>
+                    <input type="number" id="global-row" value="1" min="1" class="w-10 py-1 bg-transparent text-center text-sm outline-none">
+                </div>
+                <button onclick="applyGlobalDirect()" class="bg-gray-800 text-white px-3 py-1 rounded text-xs active:scale-95 transition">应用到全部</button>
+            </div>
+        </div>
+
+        <!-- 初始上传引导区 -->
+        <div id="upload-area" class="w-full max-w-xl mt-8">
+            <div class="border-2 border-dashed border-indigo-300 rounded-xl bg-white p-8 text-center active:bg-indigo-50 transition-colors" onclick="document.getElementById('add-file-input').click()">
+                <div class="text-4xl mb-2">📄</div>
+                <h2 class="text-lg font-bold text-gray-700">点击添加 PDF</h2>
+                <p class="text-xs text-gray-400 mt-1">支持多指触控拖拽分割线</p>
+            </div>
+            
+            <!-- 手机端友情链接列表 -->
+            <div class="mt-6 space-y-2 px-4">
+                <a href="https://www.ilovepdf.com.cn/zh-cn/" target="_blank" class="block bg-white p-3 rounded shadow-sm border border-gray-100 flex items-center justify-between text-sm text-gray-600 active:bg-gray-50">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-red-500"></span>
+                        iLovePDF (格式转换/压缩)
+                    </div>
+                    <span class="text-gray-400">→</span>
+                </a>
+                <a href="https://tools.pdf24.org/zh/" target="_blank" class="block bg-white p-3 rounded shadow-sm border border-gray-100 flex items-center justify-between text-sm text-gray-600 active:bg-gray-50">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                        PDF24 (全能工具箱)
+                    </div>
+                    <span class="text-gray-400">→</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- 页面列表 -->
+        <div id="pages-container" class="w-full max-w-5xl flex flex-col gap-4 hidden"></div>
+
+    </main>
+
+    <!-- 复制参数模态框 -->
+    <div id="copy-modal" class="hidden fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div class="bg-white w-full sm:max-w-md sm:rounded-xl rounded-t-2xl p-5 modal-enter shadow-[0_-10px_40px_rgba(0,0,0,0.1)]">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-gray-800">应用分割参数</h3>
+                <button onclick="closeCopyModal()" class="p-2 bg-gray-100 rounded-full text-gray-500">✕</button>
+            </div>
+            
+            <div class="space-y-3 mb-6">
+                <label class="flex items-center gap-3 p-3 border rounded-lg active:bg-indigo-50">
+                    <input type="radio" name="copy-target" value="all" class="w-5 h-5 text-indigo-600">
+                    <span class="font-medium">所有页面</span>
+                </label>
+                <label class="flex items-center gap-3 p-3 border rounded-lg active:bg-indigo-50">
+                    <input type="radio" name="copy-target" value="current-file" class="w-5 h-5 text-indigo-600">
+                    <span class="font-medium">仅当前文件</span>
+                </label>
+                <label class="flex flex-col p-3 border rounded-lg active:bg-indigo-50">
+                    <div class="flex items-center gap-3 mb-2">
+                        <input type="radio" name="copy-target" value="range" class="w-5 h-5 text-indigo-600" checked>
+                        <span class="font-medium">指定页码 (如 1-5, 8)</span>
+                    </div>
+                    <input type="text" id="range-input" class="w-full border rounded px-2 py-2 text-sm ml-8 w-[calc(100%-2rem)]" placeholder="输入页码...">
+                </label>
+            </div>
+
+            <button onclick="executeCopy()" class="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold text-lg active:scale-[0.98] transition">确认应用</button>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loading" class="hidden fixed inset-0 z-[100] flex items-center justify-center loading-overlay">
+        <div class="bg-white/90 px-6 py-4 rounded-xl shadow-xl flex flex-col items-center backdrop-blur">
+            <div class="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-2"></div>
+            <p id="loading-text" class="text-gray-700 font-medium text-sm">处理中...</p>
+        </div>
+    </div>
+
+    <script>
+        const state = {
+            documents: [],
+            pages: [],
+            nextDocId: 1,
+            // 增加触摸支持
+            drag: { active: false, type: null, globalIndex: -1, lineIndex: -1 },
+            copySourceIndex: -1
+        };
+
+        const els = {
+            fileInput: document.getElementById('add-file-input'),
+            uploadArea: document.getElementById('upload-area'),
+            pagesContainer: document.getElementById('pages-container'),
+            loading: document.getElementById('loading'),
+            loadingText: document.getElementById('loading-text'),
+            modal: document.getElementById('copy-modal'),
+            globalToolbar: document.getElementById('global-toolbar')
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const idx = parseInt(entry.target.dataset.index);
+                    renderPageCanvas(idx);
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { rootMargin: '200px' });
+
+        els.fileInput.addEventListener('change', handleAddFiles);
+
+        function getEvenSplits(n) {
+            n = parseInt(n) || 1;
+            if (n <= 1) return [];
+            return Array.from({length: n-1}, (_, i) => (i+1)/n);
+        }
+
+        async function handleAddFiles(e) {
+            const files = Array.from(e.target.files);
+            if (!files.length) return;
+
+            showLoading('正在解析...');
+            els.uploadArea.classList.add('hidden');
+            els.pagesContainer.classList.remove('hidden');
+            els.globalToolbar.classList.remove('hidden'); // 显示批量工具栏
+            els.globalToolbar.classList.add('flex');
+
+            try {
+                for (const file of files) {
+                    if (file.type !== 'application/pdf') continue;
+                    const buffer = await file.arrayBuffer();
+                    const pdfDoc = await pdfjsLib.getDocument(buffer).promise;
+                    const docId = state.nextDocId++;
+                    state.documents.push({ id: docId, file, pdfDoc, fileName: file.name, pageCount: pdfDoc.numPages });
+
+                    for (let i = 1; i <= pdfDoc.numPages; i++) {
+                        const globalIndex = state.pages.length;
+                        state.pages.push({
+                            globalIndex, docId, pageIndexInDoc: i,
+                            cols: [], rows: [], rendered: false
+                        });
+                        createPageCard(globalIndex);
+                    }
+                }
+            } catch (err) {
+                alert('错误: ' + err.message);
+            } finally {
+                hideLoading();
+                els.fileInput.value = '';
+            }
+        }
+
+        function createPageCard(globalIndex) {
+            const pageData = state.pages[globalIndex];
+            const docData = state.documents.find(d => d.id === pageData.docId);
+            
+            const card = document.createElement('div');
+            card.className = "bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden";
+            card.innerHTML = `
+                <div class="bg-gray-50 border-b px-3 py-2 flex justify-between items-center">
+                    <div class="overflow-hidden">
+                        <div class="font-bold text-gray-700 text-sm">P${globalIndex + 1} <span class="text-xs font-normal text-gray-400">/ ${docData.fileName}</span></div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="flex items-center border bg-white rounded">
+                            <input type="number" id="in-col-${globalIndex}" value="1" min="1" class="w-8 py-1 text-center text-xs outline-none" onchange="updatePageSplit(${globalIndex})">
+                            <span class="text-gray-300">x</span>
+                            <input type="number" id="in-row-${globalIndex}" value="1" min="1" class="w-8 py-1 text-center text-xs outline-none" onchange="updatePageSplit(${globalIndex})">
+                        </div>
+                        <button onclick="openCopyModal(${globalIndex})" class="bg-indigo-100 text-indigo-600 px-2 py-1 rounded text-xs font-bold">复制</button>
+                    </div>
+                </div>
+                <div class="bg-gray-200 flex justify-center overflow-hidden relative min-h-[150px]">
+                    <div class="relative inline-block shadow-lg bg-white my-2 lazy-canvas select-none" data-index="${globalIndex}" style="font-size: 0;">
+                        <canvas id="canvas-${globalIndex}" class="block max-w-full"></canvas>
+                        <div id="overlay-${globalIndex}" class="absolute inset-0 z-10 touch-none"></div> 
+                        <div id="placeholder-${globalIndex}" class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs">加载中...</div>
+                    </div>
+                </div>
+            `;
+            els.pagesContainer.appendChild(card);
+            observer.observe(card.querySelector('.lazy-canvas'));
+        }
+
+        async function renderPageCanvas(globalIndex) {
+            const pageData = state.pages[globalIndex];
+            const docData = state.documents.find(d => d.id === pageData.docId);
+            try {
+                const page = await docData.pdfDoc.getPage(pageData.pageIndexInDoc);
+                const canvas = document.getElementById(`canvas-${globalIndex}`);
+                const placeholder = document.getElementById(`placeholder-${globalIndex}`);
+                
+                const viewportRaw = page.getViewport({ scale: 1.0 });
+                // 手机端优化：宽度适应屏幕
+                const desiredWidth = Math.min(window.innerWidth - 40, 800);
+                const scale = desiredWidth / viewportRaw.width;
+                const viewport = page.getViewport({ scale: scale });
+
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+                placeholder.remove();
+                pageData.rendered = true;
+                renderLines(globalIndex);
+            } catch (e) { console.error(e); }
+        }
+
+        function renderLines(globalIndex) {
+            const overlay = document.getElementById(`overlay-${globalIndex}`);
+            if (!overlay) return;
+            overlay.innerHTML = '';
+            const config = state.pages[globalIndex];
+
+            // 绑定 Touch 和 Mouse 事件
+            const bindEvents = (el, type, idx) => {
+                // Mouse
+                el.addEventListener('mousedown', (e) => startDrag(e, type, globalIndex, idx));
+                // Touch
+                el.addEventListener('touchstart', (e) => {
+                    e.preventDefault(); // 防止滚动
+                    startDrag(e.touches[0], type, globalIndex, idx);
+                }, {passive: false});
+            };
+
+            config.cols.forEach((pct, idx) => {
+                const line = document.createElement('div');
+                line.className = 'line-col';
+                line.style.left = (pct * 100) + '%';
+                bindEvents(line, 'col', idx);
+                overlay.appendChild(line);
+            });
+
+            config.rows.forEach((pct, idx) => {
+                const line = document.createElement('div');
+                line.className = 'line-row';
+                line.style.top = (pct * 100) + '%';
+                bindEvents(line, 'row', idx);
+                overlay.appendChild(line);
+            });
+        }
+
+        // --- 核心：触摸/鼠标 统一处理逻辑 ---
+        function startDrag(e, type, gIdx, lIdx) {
+            // e 可能是 MouseEvent 或 Touch 对象 (含有 clientX/Y)
+            state.drag = { active: true, type, globalIndex: gIdx, lineIndex: lIdx };
+            
+            // 视觉反馈
+            const overlay = document.getElementById(`overlay-${gIdx}`);
+            const lines = overlay.querySelectorAll(type === 'col' ? '.line-col' : '.line-row');
+            if(lines[lIdx]) lines[lIdx].classList.add('active');
+        }
+
+        // 统一监听移动
+        const moveHandler = (clientX, clientY) => {
+            if (!state.drag.active) return;
+            const { type, globalIndex, lineIndex } = state.drag;
+            const overlay = document.getElementById(`overlay-${globalIndex}`);
+            if(!overlay) return;
+
+            const rect = overlay.getBoundingClientRect();
+            if (type === 'col') {
+                let x = clientX - rect.left;
+                x = Math.max(0, Math.min(x, rect.width));
+                state.pages[globalIndex].cols[lineIndex] = x / rect.width;
+            } else {
+                let y = clientY - rect.top;
+                y = Math.max(0, Math.min(y, rect.height));
+                state.pages[globalIndex].rows[lineIndex] = y / rect.height;
+            }
+            renderLines(globalIndex);
+        };
+
+        // Mouse Move
+        window.addEventListener('mousemove', e => moveHandler(e.clientX, e.clientY));
+        // Touch Move
+        window.addEventListener('touchmove', e => {
+            if(state.drag.active) e.preventDefault(); // 拖拽时禁止页面滚动
+            moveHandler(e.touches[0].clientX, e.touches[0].clientY);
+        }, {passive: false});
+
+        // End
+        const endHandler = () => {
+            state.drag.active = false;
+            document.querySelectorAll('.active').forEach(el => el.classList.remove('active'));
+        };
+        window.addEventListener('mouseup', endHandler);
+        window.addEventListener('touchend', endHandler);
+
+
+        window.updatePageSplit = (idx) => {
+            const c = document.getElementById(`in-col-${idx}`).value;
+            const r = document.getElementById(`in-row-${idx}`).value;
+            state.pages[idx].cols = getEvenSplits(c);
+            state.pages[idx].rows = getEvenSplits(r);
+            renderLines(idx);
+        };
+
+        window.applyGlobalDirect = () => {
+            const c = getEvenSplits(document.getElementById('global-col').value);
+            const r = getEvenSplits(document.getElementById('global-row').value);
+            state.pages.forEach((p, i) => {
+                p.cols = [...c]; p.rows = [...r];
+                document.getElementById(`in-col-${i}`).value = c.length+1;
+                document.getElementById(`in-row-${i}`).value = r.length+1;
+                if(p.rendered) renderLines(i);
+            });
+        };
+
+        window.openCopyModal = (idx) => {
+            state.copySourceIndex = idx;
+            els.modal.classList.remove('hidden');
+        };
+        window.closeCopyModal = () => els.modal.classList.add('hidden');
+
+        window.executeCopy = () => {
+            const src = state.pages[state.copySourceIndex];
+            const type = document.querySelector('input[name="copy-target"]:checked').value;
+            let targets = [];
+
+            if (type === 'all') targets = state.pages.map((_,i)=>i);
+            else if (type === 'current-file') targets = state.pages.map((p,i) => p.docId === src.docId ? i : -1).filter(i=>i!==-1);
+            else {
+                const parts = document.getElementById('range-input').value.split(/[,，]/);
+                parts.forEach(p => {
+                    p = p.trim();
+                    if(p.includes('-')) {
+                        const [s,e] = p.split('-').map(Number);
+                        for(let i=Math.min(s,e); i<=Math.max(s,e); i++) if(i>0 && i<=state.pages.length) targets.push(i-1);
+                    } else {
+                        const n = Number(p);
+                        if(n>0 && n<=state.pages.length) targets.push(n-1);
+                    }
+                });
+            }
+            targets.forEach(i => {
+                state.pages[i].cols = [...src.cols]; state.pages[i].rows = [...src.rows];
+                document.getElementById(`in-col-${i}`).value = src.cols.length+1;
+                document.getElementById(`in-row-${i}`).value = src.rows.length+1;
+                if(state.pages[i].rendered) renderLines(i);
+            });
+            closeCopyModal();
+        };
+
+        async function processAndDownload() {
+            if (!state.pages.length) return;
+            showLoading('正在生成...');
+            setTimeout(async () => {
+                try {
+                    const newPdf = await PDFLib.PDFDocument.create();
+                    const loadedDocs = {};
+                    for (const p of state.pages) {
+                        const d = state.documents.find(doc => doc.id === p.docId);
+                        if (!loadedDocs[d.id]) {
+                            const b = await d.file.arrayBuffer();
+                            loadedDocs[d.id] = await PDFLib.PDFDocument.load(b);
+                        }
+                        const srcDoc = loadedDocs[d.id];
+                        const page = srcDoc.getPage(p.pageIndexInDoc - 1);
+                        const { width, height } = page.getSize();
+                        
+                        const cols = [0, ...p.cols.sort((a,b)=>a-b), 1];
+                        const rows = [0, ...p.rows.sort((a,b)=>a-b), 1];
+                        
+                        // 复制页面
+                        const copies = await newPdf.copyPages(srcDoc, Array((cols.length-1)*(rows.length-1)).fill(p.pageIndexInDoc-1));
+                        let cIdx = 0;
+                        
+                        for (let r=0; r<rows.length-1; r++) {
+                            const y1 = rows[r], y2 = rows[r+1];
+                            for (let c=0; c<cols.length-1; c++) {
+                                const x1 = cols[c], x2 = cols[c+1];
+                                const cp = copies[cIdx++];
+                                cp.setCropBox(width*x1, height*(1-y2), width*(x2-x1), height*(y2-y1));
+                                newPdf.addPage(cp);
+                            }
+                        }
+                    }
+                    const b = await newPdf.save();
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(new Blob([b], {type: 'application/pdf'}));
+                    link.download = `split-${Date.now()}.pdf`;
+                    link.click();
+                } catch(e) { alert(e.message); }
+                finally { hideLoading(); }
+            }, 50);
+        }
+
+        window.resetAll = () => confirm('清空所有？') && location.reload();
+        function showLoading(t) { els.loadingText.textContent = t; els.loading.classList.remove('hidden'); }
+        function hideLoading() { els.loading.classList.add('hidden'); }
+    </script>
+</body>
+</html>
