@@ -4,960 +4,431 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PDF 超级分割工具 (小王子)</title>
-    
-    <!-- Core Libraries -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    </script>
+    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
-
     <style>
-        /* Global & Reset */
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
-        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-        
-        /* --- Split Lines --- */
-        .line-col {
-            position: absolute; top: 0; bottom: 0; width: 2px;
-            background-color: #ef4444; z-index: 50; cursor: col-resize;
-            touch-action: none; will-change: left;
-        }
-        .line-row {
-            position: absolute; left: 0; right: 0; height: 2px;
-            background-color: #3b82f6; z-index: 51; cursor: row-resize;
-            touch-action: none; will-change: top;
-        }
-
-        /* Touch Hit Areas */
+        body { font-family: system-ui, -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
+        input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+        .line-col, .line-row { position: absolute; z-index: 50; touch-action: none; will-change: left, top; }
+        .line-col { top: 0; bottom: 0; width: 2px; background: #ef4444; cursor: col-resize; }
+        .line-row { left: 0; right: 0; height: 2px; background: #3b82f6; cursor: row-resize; }
         .line-col::after { content: ''; position: absolute; left: -15px; right: -15px; top: 0; bottom: 0; }
         .line-row::after { content: ''; position: absolute; top: -15px; bottom: -15px; left: 0; right: 0; }
-        @media (min-width: 768px) {
-            .line-col::after { left: -5px; right: -5px; }
-            .line-row::after { top: -5px; bottom: -5px; }
+        
+        /* --- 修复部分开始 --- */
+        /* 原来的 .active 会强制宽高为4px导致线条变成点，现已修复 */
+        .active { 
+            box-shadow: 0 0 12px currentColor; 
+            background: currentColor; 
+            z-index: 60; 
         }
+        /* 竖线激活时，只加粗宽度 */
+        .line-col.active { width: 4px; }
+        /* 横线激活时，只加粗高度 */
+        .line-row.active { height: 4px; }
+        /* --- 修复部分结束 --- */
 
-        .line-col.active { background-color: #f43f5e; width: 4px; margin-left: -1px; box-shadow: 0 0 12px rgba(244, 63, 94, 0.8); }
-        .line-row.active { background-color: #0ea5e9; height: 4px; margin-top: -1px; box-shadow: 0 0 12px rgba(14, 165, 233, 0.8); }
-
-        /* Animations & Modals */
         .loading-overlay { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(8px); }
-        .modal-enter { animation: modalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
-        @keyframes modalPop { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        .modal-enter { animation: pop 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes pop { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         
-        .btn-active:active { transform: scale(0.96); opacity: 0.9; }
-        .preview-page { border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 1rem; max-width: 100%; height: auto; }
+        /* 移动端设置面板动画 */
+        .mobile-settings-panel { transition: all 0.3s ease-in-out; overflow: hidden; max-height: 80vh; opacity: 1; }
+        .mobile-settings-panel.closed { max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; }
         
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-        /* Accordion transition - Mobile Only Logic */
-        .accordion-content { transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out; max-height: 0; opacity: 0; overflow: hidden; }
-        .accordion-content.open { max-height: 500px; opacity: 1; }
-        .accordion-icon { transition: transform 0.3s; }
-        .accordion-icon.open { transform: rotate(180deg); }
-        
-        /* Desktop: Force Expand & Hide Icons */
-        @media (min-width: 768px) {
-            /* Ensure the container is visible */
-            .mobile-settings-panel {
-                display: block !important;
-                max-height: none !important;
-                opacity: 1 !important;
-            }
-        }
-        
-        /* Mobile Console Toggle */
-        .mobile-settings-panel { transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out; overflow: hidden; }
-        .mobile-settings-panel.closed { max-height: 0; opacity: 0; }
-        .mobile-settings-panel.open { max-height: 80vh; opacity: 1; }
+        @media (min-width: 768px) { .mobile-settings-panel { display: block !important; max-height: none !important; opacity: 1 !important; } }
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen flex flex-col pb-24 md:pb-10">
-
-    <!-- Header -->
     <header class="bg-white/95 backdrop-blur-md shadow-sm sticky top-0 z-[100] border-b border-slate-100">
         <div class="container mx-auto px-4 h-14 md:h-16 flex justify-between items-center">
-            
-            <!-- Logo -->
             <div class="flex items-center gap-3">
                 <div class="bg-indigo-600 text-white p-2 rounded-xl shadow-lg shadow-indigo-200">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path></svg>
                 </div>
-                <div class="flex flex-col justify-center">
+                <div class="flex flex-col">
                     <h1 class="text-base md:text-lg font-bold text-slate-800 leading-tight" data-i18n="appTitle">PDF 超级分割</h1>
                     <span class="text-[10px] text-indigo-500 font-bold tracking-wide uppercase" data-i18n="appSubtitle">小王子</span>
                 </div>
             </div>
-
-            <!-- PC Toolbar -->
             <div class="flex items-center gap-2 md:gap-3">
-                <button onclick="toggleLanguage()" class="btn-active flex items-center gap-1 text-slate-500 hover:text-indigo-600 px-2 py-1 rounded-lg border border-slate-200 bg-white text-xs font-bold transition">
+                <button onclick="toggleLanguage()" class="flex items-center gap-1 text-slate-500 border border-slate-200 bg-white px-2 py-1 rounded-lg text-xs font-bold transition active:scale-95">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"></path></svg>
                     <span id="lang-text">EN</span>
                 </button>
-
                 <div class="hidden md:flex items-center gap-2">
-                    <button onclick="document.getElementById('add-file-input').click()" class="btn-active bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                        <span data-i18n="addFile">添加</span>
-                    </button>
-                    <button onclick="openPreviewConsole()" class="btn-active bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1">
-                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                        <span data-i18n="preview">预演</span>
-                    </button>
-                    <button onclick="processAndDownload()" class="btn-active bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold shadow-md flex items-center gap-1">
-                        <span data-i18n="download">下载</span>
-                    </button>
-                    <button onclick="resetAll()" class="btn-active text-slate-400 p-1.5 hover:bg-red-50 hover:text-red-500 rounded-lg" title="清空">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                    </button>
+                    <button onclick="document.getElementById('add-file-input').click()" class="bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1.5 rounded-lg text-xs font-bold" data-i18n="addFile">添加</button>
+                    <button onclick="openPreviewConsole()" class="bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-1.5 rounded-lg text-xs font-bold" data-i18n="preview">预演</button>
+                    <button onclick="processAndDownload()" class="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold shadow-md" data-i18n="download">下载</button>
+                    <button onclick="resetAll()" class="text-slate-400 p-1.5 hover:text-red-500" title="清空"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
                 </div>
             </div>
         </div>
     </header>
 
     <main class="flex-grow container mx-auto px-4 pt-6 flex flex-col items-center">
-        
-        <!-- Toolbar: Global Split Settings (Batch) -->
         <div id="global-toolbar" class="hidden w-full max-w-5xl mb-6 p-1 pr-2 bg-white rounded-2xl shadow-sm border border-slate-100 flex-wrap justify-between items-center gap-2 animate-[fadeIn_0.3s]">
             <div class="flex items-center gap-2 px-3 py-2 bg-indigo-50 rounded-xl">
                 <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                 <span class="text-sm text-indigo-900 font-bold" data-i18n="batchSettings">批量设置</span>
             </div>
             <div class="flex items-center gap-2 flex-grow justify-end">
-                <div class="flex items-center border border-slate-200 rounded-lg bg-white px-2 py-1 shadow-sm">
-                    <span class="text-[10px] text-red-500 font-bold uppercase mr-1 tracking-wider" data-i18n="cols">列数</span>
-                    <input type="number" id="global-col" value="1" min="1" class="w-8 bg-transparent text-center text-sm outline-none font-bold text-slate-700">
-                </div>
-                <div class="flex items-center border border-slate-200 rounded-lg bg-white px-2 py-1 shadow-sm">
-                    <span class="text-[10px] text-blue-500 font-bold uppercase mr-1 tracking-wider" data-i18n="rows">行数</span>
-                    <input type="number" id="global-row" value="1" min="1" class="w-8 bg-transparent text-center text-sm outline-none font-bold text-slate-700">
-                </div>
-                <button onclick="applyGlobalDirect()" class="btn-active bg-slate-800 text-white px-4 py-1.5 rounded-lg text-xs font-medium shadow-md" data-i18n="applyAll">应用到全部</button>
+                <div class="flex items-center border border-slate-200 rounded-lg bg-white px-2 py-1"><span class="text-[10px] text-red-500 font-bold uppercase mr-1" data-i18n="cols">列数</span><input type="number" id="global-col" value="1" min="1" class="w-8 text-center text-sm font-bold outline-none"></div>
+                <div class="flex items-center border border-slate-200 rounded-lg bg-white px-2 py-1"><span class="text-[10px] text-blue-500 font-bold uppercase mr-1" data-i18n="rows">行数</span><input type="number" id="global-row" value="1" min="1" class="w-8 text-center text-sm font-bold outline-none"></div>
+                <button onclick="applyGlobalDirect()" class="bg-slate-800 text-white px-4 py-1.5 rounded-lg text-xs" data-i18n="applyAll">应用到全部</button>
             </div>
         </div>
 
-        <!-- Initial Upload Area -->
-        <div id="upload-area" class="w-full max-w-xl mt-8 transition-all duration-200">
-            <div class="group relative border-2 border-dashed border-indigo-200 rounded-3xl bg-white p-10 text-center hover:border-indigo-400 hover:bg-indigo-50/30 transition-all cursor-pointer shadow-sm hover:shadow-md" id="drop-zone">
-                <div class="w-16 h-16 bg-indigo-50 text-indigo-500 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 group-hover:bg-indigo-100 transition-all duration-300 pointer-events-none">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-                </div>
-                <h2 class="text-xl font-bold text-slate-700 pointer-events-none" data-i18n="clickUpload">点击添加 PDF 或图片</h2>
-                <p class="text-sm text-slate-400 mt-2 pointer-events-none" data-i18n="slogan">小王子为你施展分割魔法</p>
-                <div class="absolute inset-0 z-10" onclick="document.getElementById('add-file-input').click()"></div>
+        <div id="upload-area" class="w-full max-w-xl mt-8">
+            <div class="group relative border-2 border-dashed border-indigo-200 rounded-3xl bg-white p-10 text-center hover:border-indigo-400 transition-all cursor-pointer shadow-sm" id="drop-zone">
+                <div class="w-16 h-16 bg-indigo-50 text-indigo-500 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform"><svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+                <h2 class="text-xl font-bold text-slate-700" data-i18n="clickUpload">点击添加 PDF 或图片</h2>
+                <p class="text-sm text-slate-400 mt-2" data-i18n="slogan">小王子为你施展分割魔法</p>
+                <div class="absolute inset-0 z-10"></div>
             </div>
-            
-            <!-- Friend Links -->
             <div class="mt-8 space-y-3 px-2">
-                <a href="https://www.ilovepdf.com.cn/" target="_blank" class="flex items-center justify-between p-4 bg-white rounded-2xl shadow-sm border border-slate-100 hover:border-red-200 hover:shadow-md transition-all group">
+                <a id="pdfcraft-link" href="https://pdfcraft.devtoolcafe.com/zh/" target="_blank" class="flex items-center justify-between p-4 bg-white rounded-2xl shadow-sm border border-slate-100 hover:border-indigo-200 transition-all">
                     <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-red-500 group-hover:bg-red-500 group-hover:text-white transition-colors shrink-0">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
-                        </div>
-                        <div class="text-left">
-                            <div class="text-sm font-bold text-slate-700">iLovePDF</div>
-                            <div class="text-xs text-slate-400" data-i18n="ilovepdfDesc">专业的 PDF 转换与压缩工具</div>
-                        </div>
+                        <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-500 shrink-0"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" stroke-width="2"></path></svg></div>
+                        <div class="text-left"><div class="text-sm font-bold text-slate-700">PDFCraft</div><div class="text-xs text-slate-400" data-i18n="pdfcraftDesc">极致轻便的 PDF 在线处理工具箱</div></div>
                     </div>
                 </a>
-
-                <a href="https://tools.pdf24.org/zh/" target="_blank" class="flex items-center justify-between p-4 bg-white rounded-2xl shadow-sm border border-slate-100 hover:border-blue-200 hover:shadow-md transition-all group">
+                <a href="https://tools.pdf24.org/zh/" target="_blank" class="flex items-center justify-between p-4 bg-white rounded-2xl shadow-sm border border-slate-100 hover:border-blue-200 transition-all">
                     <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-colors shrink-0">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                        </div>
-                        <div class="text-left">
-                            <div class="text-sm font-bold text-slate-700">PDF24</div>
-                            <div class="text-xs text-slate-400" data-i18n="pdf24Desc">免费且功能强大的离线级工具</div>
-                        </div>
+                        <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-500 shrink-0"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" stroke-width="2"></path></svg></div>
+                        <div class="text-left"><div class="text-sm font-bold text-slate-700">PDF24</div><div class="text-xs text-slate-400" data-i18n="pdf24Desc">免费且功能强大的离线级工具</div></div>
                     </div>
                 </a>
             </div>
         </div>
-
-        <!-- Pages Grid -->
         <div id="pages-container" class="w-full max-w-5xl flex flex-col gap-5 hidden pb-20"></div>
-
     </main>
 
-    <!-- Mobile Bottom Bar -->
-    <div id="bottom-bar" class="hidden fixed bottom-6 left-4 right-4 z-[90] flex justify-end items-center gap-2 md:hidden fade-in pointer-events-none">
-        <div class="pointer-events-auto bg-white/90 backdrop-blur-md border border-slate-200 rounded-2xl shadow-2xl p-2 flex gap-2">
-            <button onclick="resetAll()" class="flex items-center justify-center w-8 h-8 text-red-400 bg-red-50 rounded-lg hover:bg-red-100" title="清空">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-            </button>
+    <div id="bottom-bar" class="hidden fixed bottom-6 left-4 right-4 z-[90] flex justify-end items-center gap-2 md:hidden">
+        <div class="bg-white/90 backdrop-blur-md border border-slate-200 rounded-2xl shadow-2xl p-2 flex gap-2">
+            <button onclick="resetAll()" class="w-8 h-8 text-red-400 bg-red-50 rounded-lg flex items-center justify-center"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-width="2"></path></svg></button>
             <div class="w-px bg-slate-200 h-8 mx-1"></div>
-            <button onclick="document.getElementById('add-file-input').click()" class="btn-active flex flex-col items-center justify-center px-2 text-slate-500 hover:text-indigo-600">
-                <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                <span class="text-[9px] font-bold leading-none" data-i18n="addFile">添加</span>
-            </button>
-            <button onclick="openPreviewConsole()" class="btn-active flex flex-col items-center justify-center px-2 text-emerald-600 hover:text-emerald-700">
-                <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                <span class="text-[9px] font-bold leading-none" data-i18n="preview">预演</span>
-            </button>
-            <button onclick="processAndDownload()" class="btn-active bg-indigo-600 text-white px-3 py-1.5 rounded-lg shadow-md font-bold flex items-center gap-1 text-xs">
-                <span data-i18n="download">下载</span>
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-            </button>
+            <button onclick="document.getElementById('add-file-input').click()" class="px-2 text-slate-500 flex flex-col items-center"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" stroke-width="2"></path></svg><span class="text-[9px] font-bold" data-i18n="addFile">添加</span></button>
+            <button onclick="openPreviewConsole()" class="px-2 text-emerald-600 flex flex-col items-center"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-width="2"></path><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" stroke-width="2"></path></svg><span class="text-[9px] font-bold" data-i18n="preview">预演</span></button>
+            <button onclick="processAndDownload()" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold" data-i18n="download">下载</button>
         </div>
     </div>
 
-    <!-- PREVIEW CONSOLE MODAL -->
-    <div id="preview-modal" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/90 backdrop-blur-sm p-4">
-        <div class="bg-white w-full max-w-6xl h-[90vh] rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden modal-enter">
+    <div id="preview-modal" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/90 p-4">
+        <div class="bg-white w-full max-w-6xl h-[90vh] rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden modal-enter relative">
             
-            <!-- Sidebar: Controls -->
-            <div class="w-full md:w-80 bg-slate-50 border-b md:border-b-0 md:border-r border-slate-200 flex flex-col shrink-0">
-                <!-- Mobile Toggle Header -->
-                <div class="p-4 border-b border-slate-200 bg-white flex justify-between items-center cursor-pointer md:cursor-default" onclick="toggleMobileSettings()">
+            <div class="w-full md:w-80 bg-slate-50 border-r border-slate-200 flex flex-col shrink-0">
+                <!-- Mobile Header -->
+                <div class="p-4 border-b bg-white flex justify-between items-center cursor-pointer md:cursor-default" onclick="toggleMobileSettings()">
                     <div>
                         <h3 class="font-bold text-lg text-slate-800" data-i18n="previewConsole">高级输出控制台</h3>
                         <p class="text-xs text-slate-400 hidden md:block" data-i18n="consoleDesc">调整参数后点击刷新</p>
                     </div>
-                    <!-- Mobile Toggle Icon -->
-                    <div class="md:hidden flex items-center gap-2 text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg">
-                        <span class="text-xs font-bold" data-i18n="settingsToggle">设置</span>
-                        <svg id="mobile-toggle-icon" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    
+                    <!-- Mobile Top Right Controls -->
+                    <div class="flex items-center gap-2 md:hidden">
+                        <!-- Settings Toggle -->
+                        <div class="flex items-center gap-2 text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg">
+                            <span class="text-xs font-bold" data-i18n="settingsToggle">设置</span>
+                            <svg id="mobile-toggle-icon" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" stroke-width="2"></path></svg>
+                        </div>
+                        
+                        <!-- Mobile Close (X) Button -->
+                        <button onclick="event.stopPropagation(); closePreview()" class="p-1.5 bg-slate-100 rounded-full text-slate-500 hover:bg-red-50 hover:text-red-500 transition ml-1">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
                     </div>
                 </div>
                 
-                <!-- Collapsible Settings Container (Mobile Only logic handled via CSS/JS) -->
-                <div id="settings-container" class="mobile-settings-panel flex-grow p-4 overflow-y-auto space-y-3 bg-slate-50 md:bg-transparent md:block md:max-h-full md:opacity-100 closed">
+                <div id="settings-container" class="mobile-settings-panel flex-grow p-4 space-y-3 closed">
+                    <!-- 切片排序 (固定展开) -->
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="w-full px-4 py-3 flex items-center gap-2 border-b border-slate-100 bg-slate-50/50">
+                            <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" stroke-width="2"></path></svg>
+                            <span class="text-sm font-bold text-slate-700" data-i18n="sliceOrder">切片排序</span>
+                        </div>
+                        <div class="p-4">
+                            <select id="preview-order-select" class="w-full border rounded-lg px-3 py-2 text-sm font-bold"><option value="row" data-i18n="orderRow">行优先 (Z字形)</option><option value="col" data-i18n="orderCol">列优先 (N字形)</option></select>
+                        </div>
+                    </div>
                     
-                    <!-- Accordion 1: Order -->
+                    <!-- 切片后旋转 (固定展开) -->
                     <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                        <button onclick="toggleAccordion('acc-order')" class="accordion-btn w-full px-4 py-3 flex items-center justify-between bg-white hover:bg-slate-50 transition">
-                            <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path></svg>
-                                <span class="text-sm font-bold text-slate-700" data-i18n="sliceOrder">切片排序</span>
-                            </div>
-                            <svg id="icon-acc-order" class="w-4 h-4 text-slate-400 accordion-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                        </button>
-                        <div id="acc-order" class="accordion-content bg-slate-50 border-t border-slate-100">
-                             <div class="p-4">
-                                <select id="preview-order-select" class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-700 outline-none focus:ring-2 ring-indigo-100 cursor-pointer">
-                                    <option value="row" data-i18n="orderRow">行优先 (Z字形: 左-右, 上-下)</option>
-                                    <option value="col" data-i18n="orderCol">列优先 (N字形: 上-下, 左-右)</option>
-                                </select>
-                                <p class="text-[10px] text-slate-400 mt-2 leading-relaxed" data-i18n="orderDesc">决定了切片进入合并队列的顺序</p>
-                             </div>
+                        <div class="w-full px-4 py-3 flex items-center gap-2 border-b border-slate-100 bg-slate-50/50">
+                            <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-width="2"></path></svg>
+                            <span class="text-sm font-bold text-slate-700" data-i18n="sliceRotation">切片后旋转</span>
+                        </div>
+                        <div class="p-4 flex gap-2">
+                            <button onclick="setPreviewRotation(0)" class="rot-btn flex-1 py-1.5 rounded-lg border text-xs font-bold bg-indigo-600 text-white" data-val="0">0°</button>
+                            <button onclick="setPreviewRotation(90)" class="rot-btn flex-1 py-1.5 rounded-lg border text-xs font-bold" data-val="90">90°</button>
+                            <button onclick="setPreviewRotation(180)" class="rot-btn flex-1 py-1.5 rounded-lg border text-xs font-bold" data-val="180">180°</button>
+                            <button onclick="setPreviewRotation(270)" class="rot-btn flex-1 py-1.5 rounded-lg border text-xs font-bold" data-val="270">270°</button>
                         </div>
                     </div>
-
-                    <!-- Accordion 2: Rotation -->
-                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                        <button onclick="toggleAccordion('acc-rot')" class="accordion-btn w-full px-4 py-3 flex items-center justify-between bg-white hover:bg-slate-50 transition">
-                            <div class="flex items-center gap-2">
-                                <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                                <span class="text-sm font-bold text-slate-700" data-i18n="sliceRotation">切片后旋转</span>
-                            </div>
-                            <svg id="icon-acc-rot" class="w-4 h-4 text-slate-400 accordion-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                        </button>
-                        <div id="acc-rot" class="accordion-content bg-slate-50 border-t border-slate-100">
-                            <div class="p-4">
-                                <div class="grid grid-cols-4 gap-2">
-                                    <button onclick="setPreviewRotation(0)" class="rot-btn px-2 py-1.5 rounded-lg border text-xs font-bold hover:bg-indigo-50 transition bg-indigo-600 text-white border-indigo-600" data-val="0">0°</button>
-                                    <button onclick="setPreviewRotation(90)" class="rot-btn px-2 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-bold hover:bg-indigo-50 transition" data-val="90">90°</button>
-                                    <button onclick="setPreviewRotation(180)" class="rot-btn px-2 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-bold hover:bg-indigo-50 transition" data-val="180">180°</button>
-                                    <button onclick="setPreviewRotation(270)" class="rot-btn px-2 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-bold hover:bg-indigo-50 transition" data-val="270">270°</button>
-                                </div>
-                                <p class="text-[10px] text-slate-400 mt-2 leading-relaxed" data-i18n="rotDesc">对每一个独立的切片进行旋转</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="pt-2 pb-6 md:pb-0">
-                         <button onclick="refreshPreview()" class="w-full py-3 bg-slate-800 text-white rounded-xl shadow-lg hover:bg-slate-700 hover:scale-[1.02] active:scale-[0.98] transition flex items-center justify-center gap-2">
-                             <svg class="w-4 h-4 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                             <span data-i18n="refreshPreview">刷新预览 / 生效</span>
-                         </button>
-                    </div>
+                    
+                    <button onclick="refreshPreview()" class="w-full py-3 bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2"><svg class="w-4 h-4 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-width="2"></path></svg><span data-i18n="refreshPreview">刷新预览 / 生效</span></button>
                 </div>
-
-                <div class="p-4 border-t border-slate-200 bg-white md:hidden">
-                    <button onclick="closePreview()" class="w-full py-2 bg-slate-100 text-slate-600 rounded-lg font-bold" data-i18n="close">关闭</button>
-                </div>
+                <div class="hidden p-4 border-t bg-white md:hidden"></div>
             </div>
-
-            <!-- Main Preview Area -->
-            <div class="flex-grow flex flex-col bg-slate-100 h-full overflow-hidden relative">
+            <div class="flex-grow flex flex-col bg-slate-100 overflow-hidden relative">
+                <!-- Desktop Close Button -->
                 <div class="absolute top-4 right-4 z-10 hidden md:block">
                      <button onclick="closePreview()" class="bg-white/90 backdrop-blur p-2 rounded-full shadow hover:bg-red-50 text-slate-500 hover:text-red-500 transition">✕</button>
                 </div>
-                
-                <div id="preview-content" class="flex-grow overflow-y-auto p-4 md:p-8 flex flex-col items-center gap-6">
-                    <!-- Canvas Injected Here -->
-                </div>
-                
-                <!-- Bottom Action Bar -->
-                <div class="p-4 bg-white border-t border-slate-200 flex justify-between items-center shrink-0 z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-                    <button id="preview-more-btn" onclick="renderMorePreview()" class="hidden px-4 py-2 text-indigo-600 hover:bg-indigo-50 rounded-lg text-sm font-bold transition flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 13l-7 7-7-7m14-8l-7 7-7-7"></path></svg>
-                        <span data-i18n="loadMore">加载更多页面</span>
-                    </button>
-                    <div class="flex gap-3 ml-auto">
-                         <button onclick="closePreview()" class="hidden md:block px-5 py-2.5 text-slate-500 hover:bg-slate-100 rounded-xl font-bold transition" data-i18n="close">继续编辑</button>
-                         <button onclick="processAndDownload()" class="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 hover:shadow-xl transform hover:-translate-y-0.5 transition flex items-center gap-2">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                            <span data-i18n="downloadPDF">下载 PDF</span>
-                        </button>
+
+                <div id="preview-content" class="flex-grow overflow-y-auto p-4 md:p-8 flex flex-col items-center gap-6"></div>
+                <div class="p-4 bg-white border-t flex justify-between items-center shrink-0 z-20">
+                    <button id="preview-more-btn" onclick="renderMorePreview()" class="hidden px-4 py-2 text-indigo-600 text-sm font-bold flex items-center gap-2"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 13l-7 7-7-7" stroke-width="2"></path></svg><span data-i18n="loadMore">加载更多</span></button>
+                    <div class="flex gap-2 ml-auto">
+                        <button onclick="processAndDownload()" class="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-indigo-200"><span data-i18n="downloadPDF">下载 PDF</span></button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Copy Settings Modal -->
     <div id="copy-modal" class="hidden fixed inset-0 z-[150] flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm">
-        <div class="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl p-6 modal-enter shadow-2xl">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-lg font-bold text-slate-800" data-i18n="applySettings">应用分割参数</h3>
-                <button onclick="closeCopyModal()" class="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200">✕</button>
-            </div>
+        <div class="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-6 modal-enter">
+            <div class="flex justify-between items-center mb-6"><h3 class="text-lg font-bold" data-i18n="applySettings">应用分割参数</h3><button onclick="closeCopyModal()" class="p-2 bg-slate-100 rounded-full">✕</button></div>
             <div class="space-y-3 mb-8">
-                <label class="group flex items-center gap-4 p-4 border rounded-xl cursor-pointer hover:border-indigo-500 hover:bg-indigo-50/50 transition">
-                    <input type="radio" name="copy-target" value="all" class="w-5 h-5 text-indigo-600">
-                    <span class="font-medium text-slate-700" data-i18n="allPages">所有页面</span>
-                </label>
-                <label class="group flex items-center gap-4 p-4 border rounded-xl cursor-pointer hover:border-indigo-500 hover:bg-indigo-50/50 transition">
-                    <input type="radio" name="copy-target" value="current-file" class="w-5 h-5 text-indigo-600">
-                    <span class="font-medium text-slate-700" data-i18n="currentFile">仅当前文件</span>
-                </label>
-                <label class="group flex flex-col p-4 border rounded-xl cursor-pointer hover:border-indigo-500 hover:bg-indigo-50/50 transition">
-                    <div class="flex items-center gap-4 mb-3">
-                        <input type="radio" name="copy-target" value="range" class="w-5 h-5 text-indigo-600" checked>
-                        <span class="font-medium text-slate-700" data-i18n="pageRange">指定页码范围</span>
-                    </div>
-                    <input type="text" id="range-input" class="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 ring-indigo-200" placeholder="1-5, 8">
-                </label>
+                <label class="flex items-center gap-4 p-4 border rounded-xl cursor-pointer"><input type="radio" name="copy-target" value="all" class="w-5 h-5"><span data-i18n="allPages">所有页面</span></label>
+                <label class="flex items-center gap-4 p-4 border rounded-xl cursor-pointer"><input type="radio" name="copy-target" value="current-file" class="w-5 h-5"><span data-i18n="currentFile">仅当前文件</span></label>
+                <label class="flex flex-col p-4 border rounded-xl cursor-pointer"><div class="flex items-center gap-4 mb-3"><input type="radio" name="copy-target" value="range" class="w-5 h-5" checked><span data-i18n="pageRange">指定页码范围</span></div><input type="text" id="range-input" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="1-5, 8"></label>
             </div>
-            <button onclick="executeCopy()" class="btn-active w-full py-3.5 bg-indigo-600 text-white rounded-xl font-bold text-base shadow-lg" data-i18n="confirmApply">确认应用</button>
+            <button onclick="executeCopy()" class="w-full py-3.5 bg-indigo-600 text-white rounded-xl font-bold" data-i18n="confirmApply">确认应用</button>
         </div>
     </div>
 
-    <!-- Loading -->
     <div id="loading" class="hidden fixed inset-0 z-[300] flex items-center justify-center loading-overlay">
-        <div class="bg-white/90 px-8 py-6 rounded-2xl shadow-xl flex flex-col items-center border border-white/50">
-            <div class="relative w-12 h-12 mb-4">
-                <div class="absolute inset-0 border-4 border-indigo-100 rounded-full"></div>
-                <div class="absolute inset-0 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-            </div>
-            <p id="loading-text" class="text-slate-700 font-bold tracking-wide" data-i18n="loadingMagic">正在施展分割魔法...</p>
+        <div class="bg-white/90 px-8 py-6 rounded-2xl shadow-xl flex flex-col items-center">
+            <div class="w-12 h-12 mb-4 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+            <p id="loading-text" class="text-slate-700 font-bold" data-i18n="loadingMagic">正在施展分割魔法...</p>
         </div>
     </div>
 
-    <!-- Accepting multiple images and PDFs -->
-    <input type="file" id="add-file-input" accept="application/pdf,image/jpeg,image/png,image/webp,image/bmp" multiple class="hidden" />
+    <input type="file" id="add-file-input" accept="application/pdf,image/*" multiple class="hidden" />
 
     <script>
-        // --- I18n ---
-        const i18n = {
-            zh: {
-                appTitle: "PDF 超级分割工具", appSubtitle: "小王子", addFile: "添加", download: "下载", preview: "预演",
-                batchSettings: "批量分割", cols: "列数", rows: "行数", applyAll: "应用到全部", clickUpload: "点击添加 PDF 或图片",
-                slogan: "小王子为你施展分割魔法", ilovepdfDesc: "专业的 PDF 转换与压缩工具", pdf24Desc: "免费且功能强大的离线级工具",
-                applySettings: "应用分割参数", allPages: "所有页面", currentFile: "仅当前文件", pageRange: "指定页码范围",
-                confirmApply: "确认应用", loadingMagic: "正在施展分割魔法...", parsing: "正在解析魔法书...", copy: "复制",
-                loading: "加载中...", alertParseError: "解析失败: ", alertClear: "确定清空所有内容重新开始吗？", placeholderRange: "例如: 1-5, 8",
-                previewConsole: "高级输出控制台", consoleDesc: "调整参数后点击刷新", close: "关闭", clear: "清空", loadMore: "加载更多页面",
-                sliceRotation: "切片后旋转", mergeNup: "分割后合并 (N-up)", mergeNone: "不合并 (保持切片)", merge2: "2 合 1", merge4: "4 合 1",
-                mergeCustom: "自定义布局...", layoutGrid: "网格布局 (行 x 列)", refreshPreview: "刷新预览 / 生效", downloadPDF: "下载 PDF",
-                sliceOrder: "切片排序", orderRow: "行优先 (Z字形)", orderCol: "列优先 (N字形)", orderDesc: "决定切片进入合并队列的顺序",
-                rotDesc: "对排序后的独立切片进行旋转", mergeDesc: "将切片队列填入新纸张", settingsToggle: "设置"
-            },
-            en: {
-                appTitle: "PDF Grid Cutter", appSubtitle: "Little Prince Edition", addFile: "Add", download: "DL", preview: "Preview",
-                batchSettings: "Batch Split", cols: "Cols", rows: "Rows", applyAll: "Apply to All", clickUpload: "Click/Drag PDF or Images",
-                slogan: "Little Prince casts splitting magic", ilovepdfDesc: "Professional Tools", pdf24Desc: "Powerful Offline Tools",
-                applySettings: "Apply Settings", allPages: "All Pages", currentFile: "Current File", pageRange: "Range",
-                confirmApply: "Apply", loadingMagic: "Casting magic...", parsing: "Parsing...", copy: "Copy",
-                loading: "Loading...", alertParseError: "Error: ", alertClear: "Clear all?", placeholderRange: "e.g. 1-5",
-                previewConsole: "Advanced Console", consoleDesc: "Refresh to apply changes", close: "Close", clear: "Clear", loadMore: "Load More",
-                sliceRotation: "Slice Rotation", mergeNup: "Merge (N-up)", mergeNone: "None (Slices)", merge2: "2-Up", merge4: "4-Up",
-                mergeCustom: "Custom Layout...", layoutGrid: "Grid Layout (Rows x Cols)", refreshPreview: "Refresh Preview", downloadPDF: "Download PDF",
-                sliceOrder: "Slice Order", orderRow: "Row Major (Z-order)", orderCol: "Col Major (N-order)", orderDesc: "Order of slices before merging",
-                rotDesc: "Rotate each slice individually", mergeDesc: "Fill grid with slice queue", settingsToggle: "Settings"
-            }
-        };
-        let currentLang = 'zh';
-        function t(key) { return i18n[currentLang][key] || key; }
-        function toggleLanguage() {
-            currentLang = currentLang === 'zh' ? 'en' : 'zh';
-            document.getElementById('lang-text').innerText = currentLang === 'zh' ? 'EN' : '中';
-            updateUI();
-        }
+        const state = { documents: [], pages: [], nextDocId: 1, drag: { active: false }, outputSettings: { rotation: 0, sortOrder: 'row' }, previewPdfDoc: null, previewPageNum: 1, copySourceIndex: -1 };
+        const els = { fileInput: document.getElementById('add-file-input'), uploadArea: document.getElementById('upload-area'), dropZone: document.getElementById('drop-zone'), pagesContainer: document.getElementById('pages-container'), loading: document.getElementById('loading'), loadingText: document.getElementById('loading-text'), modal: document.getElementById('copy-modal'), previewModal: document.getElementById('preview-modal'), previewContent: document.getElementById('preview-content'), previewMoreBtn: document.getElementById('preview-more-btn'), globalToolbar: document.getElementById('global-toolbar'), bottomBar: document.getElementById('bottom-bar') };
+
+        function t(k) { return i18n[currentLang][k] || k; }
+        function toggleLanguage() { currentLang = currentLang === 'zh' ? 'en' : 'zh'; updateUI(); }
         function updateUI() {
-            document.querySelectorAll('[data-i18n]').forEach(el => el.innerText = t(el.getAttribute('data-i18n')));
-            document.getElementById('range-input').placeholder = t('placeholderRange');
-            document.querySelectorAll('.i18n-copy-btn').forEach(btn => btn.innerText = t('copy'));
-            document.querySelectorAll('.i18n-loading').forEach(div => div.innerText = t('loading'));
+            document.querySelectorAll('[data-i18n]').forEach(el => el.innerText = t(el.dataset.i18n));
+            document.getElementById('lang-text').innerText = currentLang === 'zh' ? 'EN' : '中';
+            const link = document.getElementById('pdfcraft-link');
+            if (link) link.href = `https://pdfcraft.devtoolcafe.com/${currentLang === 'zh' ? 'zh/' : ''}`;
         }
 
-        // --- State ---
-        const state = {
-            documents: [],
-            pages: [],
-            nextDocId: 1,
-            drag: { active: false, type: null, globalIndex: -1, lineIndex: -1, element: null },
-            outputSettings: { rotation: 0, mergeCount: 1, layoutRows: 1, layoutCols: 1, sortOrder: 'row' },
-            previewPdfDoc: null,
-            previewPageNum: 1,
-            copySourceIndex: -1
-        };
-
-        const els = {
-            fileInput: document.getElementById('add-file-input'),
-            uploadArea: document.getElementById('upload-area'),
-            dropZone: document.getElementById('drop-zone'),
-            pagesContainer: document.getElementById('pages-container'),
-            loading: document.getElementById('loading'),
-            loadingText: document.getElementById('loading-text'),
-            modal: document.getElementById('copy-modal'),
-            previewModal: document.getElementById('preview-modal'),
-            previewContent: document.getElementById('preview-content'),
-            previewMoreBtn: document.getElementById('preview-more-btn'),
-            globalToolbar: document.getElementById('global-toolbar'),
-            bottomBar: document.getElementById('bottom-bar')
-        };
-
-        // --- Drag & Drop ---
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
-            document.body.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); }, false);
-        });
-        els.dropZone.addEventListener('dragenter', () => els.dropZone.classList.add('drag-active'));
-        els.dropZone.addEventListener('dragleave', () => els.dropZone.classList.remove('drag-active'));
-        els.dropZone.addEventListener('drop', (e) => { els.dropZone.classList.remove('drag-active'); handleFiles(e.dataTransfer.files); });
-        els.fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+        els.dropZone.onclick = () => els.fileInput.click();
+        els.fileInput.onchange = e => handleFiles(e.target.files);
+        els.dropZone.ondrop = e => { e.preventDefault(); handleFiles(e.dataTransfer.files); };
+        ['dragover', 'dragenter'].forEach(v => els.dropZone['on'+v] = e => { e.preventDefault(); els.dropZone.classList.add('border-indigo-500'); });
 
         async function handleFiles(files) {
-            const fileList = Array.from(files);
-            if (!fileList.length) return;
+            if (!files.length) return;
             showLoading(t('parsing'));
-            
-            // UI State updates
-            els.uploadArea.classList.add('hidden');
-            els.pagesContainer.classList.remove('hidden');
-            els.globalToolbar.classList.remove('hidden'); els.globalToolbar.classList.add('flex');
-            els.bottomBar.classList.remove('hidden'); els.bottomBar.classList.add('flex');
-
+            [els.uploadArea, els.pagesContainer, els.globalToolbar, els.bottomBar].forEach(el => el.classList.toggle('hidden', el === els.uploadArea));
             try {
-                for (const file of fileList) {
-                    let pdfBytes = null;
-                    let pdfDoc = null; // PDF.js document for preview
-                    let storageFile = file; // The file to store in state (source for generation)
-
+                for (const file of files) {
+                    let doc = null, storage = file;
                     if (file.type === 'application/pdf') {
-                        storageFile = file;
-                        const buffer = await file.arrayBuffer();
-                        pdfDoc = await pdfjsLib.getDocument(buffer).promise;
+                        doc = await pdfjsLib.getDocument(await file.arrayBuffer()).promise;
                     } else if (file.type.startsWith('image/')) {
-                        try {
-                            pdfBytes = await imageToPdfBytes(file);
-                            // Create a Blob representing this generated PDF
-                            storageFile = new Blob([pdfBytes], { type: 'application/pdf' });
-                            // Monkey-patch name so it displays correctly in UI
-                            storageFile.name = file.name; 
-                            pdfDoc = await pdfjsLib.getDocument(pdfBytes).promise;
-                        } catch (e) {
-                            console.error("Skip image:", file.name, e);
-                            continue;
-                        }
-                    } else {
-                        continue;
-                    }
-
+                        const bytes = await imageToPdfBytes(file);
+                        storage = new Blob([bytes], {type:'application/pdf'}); storage.name = file.name;
+                        doc = await pdfjsLib.getDocument(bytes).promise;
+                    } else continue;
                     const docId = state.nextDocId++;
-                    state.documents.push({ id: docId, file: storageFile, pdfDoc, fileName: file.name });
-                    
-                    for (let i = 1; i <= pdfDoc.numPages; i++) {
-                        state.pages.push({ 
-                            globalIndex: state.pages.length, docId, pageIndexInDoc: i, 
-                            cols: [], rows: [], rendered: false 
-                        });
-                        createPageCard(state.pages.length - 1);
+                    state.documents.push({ id: docId, file: storage, pdfDoc: doc, fileName: file.name });
+                    for (let i = 1; i <= doc.numPages; i++) {
+                        const idx = state.pages.length;
+                        state.pages.push({ docId, pageIndexInDoc: i, cols: [], rows: [], rendered: false });
+                        createPageCard(idx);
                     }
                 }
-            } catch (err) { alert(t('alertParseError') + err.message); } 
-            finally { hideLoading(); els.fileInput.value = ''; }
+            } catch (e) { alert(t('alertParseError') + e.message); } finally { hideLoading(); els.fileInput.value = ''; }
         }
 
         async function imageToPdfBytes(file) {
-             const pdfDoc = await PDFLib.PDFDocument.create();
-             let image;
-             const buffer = await file.arrayBuffer();
-
-             // Attempt direct embedding for speed if supported
-             if (file.type === 'image/jpeg' || file.type === 'image/jpg') {
-                 image = await pdfDoc.embedJpg(buffer);
-             } else if (file.type === 'image/png') {
-                 image = await pdfDoc.embedPng(buffer);
-             } else {
-                 // Fallback for WebP, BMP, etc. via Canvas
-                 image = await convertAndEmbedImage(file, pdfDoc);
-             }
-
-             const page = pdfDoc.addPage([image.width, image.height]);
-             page.drawImage(image, {
-                 x: 0, y: 0, width: image.width, height: image.height
-             });
-             return await pdfDoc.save();
+            const pdf = await PDFLib.PDFDocument.create();
+            const buf = await file.arrayBuffer();
+            const img = file.type === 'image/png' ? await pdf.embedPng(buf) : await pdf.embedJpg(buf);
+            const page = pdf.addPage([img.width, img.height]);
+            page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+            return await pdf.save();
         }
 
-        async function convertAndEmbedImage(file, pdfDoc) {
-             return new Promise((resolve, reject) => {
-                 const img = new Image();
-                 img.onload = async () => {
-                     const canvas = document.createElement('canvas');
-                     canvas.width = img.width;
-                     canvas.height = img.height;
-                     const ctx = canvas.getContext('2d');
-                     ctx.drawImage(img, 0, 0);
-                     // Convert to PNG blob for universal embedding support
-                     canvas.toBlob(async (blob) => {
-                         if(!blob) return reject(new Error('Canvas conversion failed'));
-                         const buf = await blob.arrayBuffer();
-                         const embedded = await pdfDoc.embedPng(buf);
-                         resolve(embedded);
-                     }, 'image/png');
-                 };
-                 img.onerror = reject;
-                 img.src = URL.createObjectURL(file);
-             });
-        }
-
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    renderPageCanvas(parseInt(entry.target.dataset.index));
-                    observer.unobserve(entry.target);
-                }
-            });
-        }, { rootMargin: '300px' });
-
-        function getEvenSplits(n) {
-            n = parseInt(n) || 1;
-            if (n <= 1) return [];
-            return Array.from({length: n-1}, (_, i) => (i+1)/n);
-        }
+        const observer = new IntersectionObserver(entries => entries.forEach(e => {
+            if (e.isIntersecting) { renderPageCanvas(parseInt(e.target.dataset.index)); observer.unobserve(e.target); }
+        }), { rootMargin: '300px' });
 
         function createPageCard(idx) {
-            const p = state.pages[idx];
-            const d = state.documents.find(doc => doc.id === p.docId);
+            const p = state.pages[idx], d = state.documents.find(doc => doc.id === p.docId);
             const card = document.createElement('div');
             card.className = "bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden";
             card.innerHTML = `
-                <div class="bg-slate-50/80 border-b border-slate-100 px-4 py-3 flex justify-between items-center gap-2">
-                    <div class="flex items-center gap-2 overflow-hidden">
-                        <span class="w-6 h-6 bg-white rounded-full flex items-center justify-center text-xs shadow-sm font-bold text-slate-500">${idx+1}</span>
-                        <span class="text-xs text-slate-400 truncate max-w-[80px]">${d.fileName}</span>
-                    </div>
+                <div class="bg-slate-50/80 border-b p-3 flex justify-between items-center">
+                    <div class="flex items-center gap-2 truncate"><span class="w-6 h-6 bg-white rounded-full flex items-center justify-center text-xs font-bold">${idx+1}</span><span class="text-xs text-slate-400 truncate">${d.fileName}</span></div>
                     <div class="flex items-center gap-2">
-                        <div class="flex items-center bg-white rounded border p-0.5 shadow-sm">
-                            <input type="number" id="in-col-${idx}" value="1" min="1" class="w-5 text-center text-xs outline-none" onchange="updatePageSplit(${idx})">
-                            <span class="text-slate-300 text-[10px]">x</span>
-                            <input type="number" id="in-row-${idx}" value="1" min="1" class="w-5 text-center text-xs outline-none" onchange="updatePageSplit(${idx})">
-                        </div>
-                        <button onclick="openCopyModal(${idx})" class="p-1.5 text-indigo-500 hover:bg-indigo-50 rounded transition i18n-copy-btn" title="${t('copy')}">${t('copy')}</button>
+                        <div class="flex items-center bg-white rounded border p-0.5"><input type="number" id="in-col-${idx}" value="1" min="1" class="w-5 text-center text-xs" onchange="updatePageSplit(${idx})"><span class="text-slate-300 text-[10px]">x</span><input type="number" id="in-row-${idx}" value="1" min="1" class="w-5 text-center text-xs" onchange="updatePageSplit(${idx})"></div>
+                        <button onclick="openCopyModal(${idx})" class="p-1.5 text-indigo-500 text-xs font-bold" data-i18n="copy">${t('copy')}</button>
                     </div>
                 </div>
-                <div class="bg-slate-100 flex justify-center relative min-h-[200px] overflow-hidden">
-                    <div class="relative inline-block shadow-lg bg-white my-4 lazy-canvas select-none" data-index="${idx}" style="font-size: 0;">
-                        <canvas id="canvas-${idx}" class="block max-w-full pointer-events-none"></canvas>
-                        <div id="overlay-${idx}" class="absolute inset-0 z-10"></div> 
-                        <div id="placeholder-${idx}" class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 text-xs i18n-loading">${t('loading')}</div>
-                    </div>
-                </div>`;
-            els.pagesContainer.appendChild(card);
-            observer.observe(card.querySelector('.lazy-canvas'));
+                <div class="bg-slate-100 flex justify-center relative min-h-[200px]"><div class="relative shadow-lg bg-white my-4 lazy-canvas select-none" data-index="${idx}"><canvas id="canvas-${idx}" class="block max-w-full pointer-events-none"></canvas><div id="overlay-${idx}" class="absolute inset-0 z-10"></div><div id="ph-${idx}" class="absolute inset-0 flex items-center justify-center text-xs text-slate-400">${t('loading')}</div></div></div>`;
+            els.pagesContainer.appendChild(card); observer.observe(card.querySelector('.lazy-canvas'));
         }
 
         async function renderPageCanvas(idx) {
-            const p = state.pages[idx];
-            if (!p) return;
-            const d = state.documents.find(doc => doc.id === p.docId);
-            try {
-                const page = await d.pdfDoc.getPage(p.pageIndexInDoc);
-                const canvas = document.getElementById(`canvas-${idx}`);
-                const ph = document.getElementById(`placeholder-${idx}`);
-                const viewport = page.getViewport({ scale: 1.0 });
-                const desiredWidth = Math.min(window.innerWidth - 32, 800);
-                const scale = desiredWidth / viewport.width;
-                const scaledViewport = page.getViewport({ scale });
-                canvas.height = scaledViewport.height; canvas.width = scaledViewport.width;
-                await page.render({ canvasContext: canvas.getContext('2d'), viewport: scaledViewport }).promise;
-                if(ph) ph.remove();
-                p.rendered = true;
-                renderLines(idx);
-            } catch (e) { console.error(e); }
+            const p = state.pages[idx], d = state.documents.find(doc => doc.id === p.docId);
+            const page = await d.pdfDoc.getPage(p.pageIndexInDoc);
+            const canvas = document.getElementById(`canvas-${idx}`), vp = page.getViewport({ scale: 1.0 });
+            const scale = Math.min(window.innerWidth - 32, 800) / vp.width, svp = page.getViewport({ scale });
+            canvas.height = svp.height; canvas.width = svp.width;
+            await page.render({ canvasContext: canvas.getContext('2d'), viewport: svp }).promise;
+            document.getElementById(`ph-${idx}`).remove(); p.rendered = true; renderLines(idx);
         }
 
         function renderLines(idx) {
-            const overlay = document.getElementById(`overlay-${idx}`);
-            if (!overlay) return;
+            const overlay = document.getElementById(`overlay-${idx}`), p = state.pages[idx];
             overlay.innerHTML = '';
-            const cfg = state.pages[idx];
-            
-            const bindEvents = (el, type, lIdx) => {
-                el.addEventListener('mousedown', (e) => startDrag(e, type, idx, lIdx, el));
-                el.addEventListener('touchstart', (e) => { e.preventDefault(); startDrag(e.touches[0], type, idx, lIdx, el); }, {passive: false});
+            const add = (pct, type, i) => {
+                const l = document.createElement('div'); l.className = type === 'col' ? 'line-col' : 'line-row';
+                l.style[type === 'col' ? 'left' : 'top'] = (pct * 100) + '%';
+                l.onmousedown = l.ontouchstart = e => { if(e.touches) e.preventDefault(); startDrag(e.touches?e.touches[0]:e, type, idx, i, l); };
+                overlay.appendChild(l);
             };
-
-            cfg.cols.forEach((pct, i) => {
-                const l = document.createElement('div'); l.className = 'line-col'; l.style.left = (pct*100)+'%';
-                bindEvents(l, 'col', i); overlay.appendChild(l);
-            });
-            cfg.rows.forEach((pct, i) => {
-                const l = document.createElement('div'); l.className = 'line-row'; l.style.top = (pct*100)+'%';
-                bindEvents(l, 'row', i); overlay.appendChild(l);
-            });
+            p.cols.forEach((v, i) => add(v, 'col', i)); p.rows.forEach((v, i) => add(v, 'row', i));
         }
 
-        function startDrag(e, type, gIdx, lIdx, element) {
-            state.drag = { active: true, type, globalIndex: gIdx, lineIndex: lIdx, element };
-            element.classList.add('active');
-        }
-
-        let rafId = null;
-        const moveHandler = (clientX, clientY) => {
-            if (!state.drag.active) return;
-            if(rafId) return;
-            rafId = requestAnimationFrame(() => {
-                const { type, globalIndex, lineIndex, element } = state.drag;
-                const overlay = document.getElementById(`overlay-${globalIndex}`);
-                if(overlay) {
-                    const rect = overlay.getBoundingClientRect();
-                    if (type === 'col') {
-                        let x = Math.max(0, Math.min(clientX - rect.left, rect.width));
-                        state.pages[globalIndex].cols[lineIndex] = x / rect.width;
-                        element.style.left = (x / rect.width * 100) + '%';
-                    } else {
-                        let y = Math.max(0, Math.min(clientY - rect.top, rect.height));
-                        state.pages[globalIndex].rows[lineIndex] = y / rect.height;
-                        element.style.top = (y / rect.height * 100) + '%';
-                    }
-                }
-                rafId = null;
-            });
+        function startDrag(e, type, gIdx, lIdx, el) { state.drag = { active: true, type, gIdx, lIdx, el }; el.classList.add('active'); }
+        window.onmousemove = window.ontouchmove = e => {
+            const d = state.drag; if (!d.active) return;
+            const rect = document.getElementById(`overlay-${d.gIdx}`).getBoundingClientRect(), move = e.touches ? e.touches[0] : e;
+            const pct = d.type === 'col' ? Math.max(0, Math.min(move.clientX - rect.left, rect.width)) / rect.width : Math.max(0, Math.min(move.clientY - rect.top, rect.height)) / rect.height;
+            state.pages[d.gIdx][d.type === 'col' ? 'cols' : 'rows'][d.lIdx] = pct;
+            d.el.style[d.type === 'col' ? 'left' : 'top'] = (pct * 100) + '%';
         };
+        window.onmouseup = window.ontouchend = () => { if(state.drag.active) state.drag.el.classList.remove('active'); state.drag.active = false; };
 
-        window.addEventListener('mousemove', e => moveHandler(e.clientX, e.clientY));
-        window.addEventListener('touchmove', e => { if(state.drag.active) e.preventDefault(); moveHandler(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
-        const endHandler = () => { state.drag.active = false; document.querySelectorAll('.active').forEach(el => el.classList.remove('active')); };
-        window.addEventListener('mouseup', endHandler);
-        window.addEventListener('touchend', endHandler);
-
-        window.updatePageSplit = (idx) => {
-            const c = document.getElementById(`in-col-${idx}`).value;
-            const r = document.getElementById(`in-row-${idx}`).value;
-            state.pages[idx].cols = getEvenSplits(c);
-            state.pages[idx].rows = getEvenSplits(r);
+        window.updatePageSplit = idx => {
+            const c = parseInt(document.getElementById(`in-col-${idx}`).value) || 1, r = parseInt(document.getElementById(`in-row-${idx}`).value) || 1;
+            state.pages[idx].cols = Array.from({length: c-1}, (_, i) => (i+1)/c);
+            state.pages[idx].rows = Array.from({length: r-1}, (_, i) => (i+1)/r);
             renderLines(idx);
         };
 
         window.applyGlobalDirect = () => {
-            const c = getEvenSplits(document.getElementById('global-col').value);
-            const r = getEvenSplits(document.getElementById('global-row').value);
+            const c = parseInt(document.getElementById('global-col').value) || 1, r = parseInt(document.getElementById('global-row').value) || 1;
             state.pages.forEach((p, i) => {
-                p.cols = [...c]; p.rows = [...r];
-                document.getElementById(`in-col-${i}`).value = c.length+1;
-                document.getElementById(`in-row-${i}`).value = r.length+1;
+                p.cols = Array.from({length: c-1}, (_, j) => (j+1)/c); p.rows = Array.from({length: r-1}, (_, j) => (j+1)/r);
+                document.getElementById(`in-col-${i}`).value = c; document.getElementById(`in-row-${i}`).value = r;
                 if(p.rendered) renderLines(i);
             });
         };
 
-        window.openCopyModal = (idx) => { state.copySourceIndex = idx; els.modal.classList.remove('hidden'); };
+        window.openCopyModal = idx => { state.copySourceIndex = idx; els.modal.classList.remove('hidden'); };
         window.closeCopyModal = () => els.modal.classList.add('hidden');
         window.executeCopy = () => {
-            const src = state.pages[state.copySourceIndex];
-            const type = document.querySelector('input[name="copy-target"]:checked').value;
+            const src = state.pages[state.copySourceIndex], type = document.querySelector('input[name="copy-target"]:checked').value;
             let targets = [];
-            if (type === 'all') targets = state.pages.map((_,i)=>i);
-            else if (type === 'current-file') targets = state.pages.map((p,i) => p.docId === src.docId ? i : -1).filter(i=>i!==-1);
+            if(type === 'all') targets = state.pages.map((_,i)=>i);
+            else if(type === 'current-file') targets = state.pages.map((p,i) => p.docId === src.docId ? i : -1).filter(i=>i!==-1);
             else {
-                const parts = document.getElementById('range-input').value.split(/[,，]/);
-                parts.forEach(p => {
-                    p = p.trim();
-                    if(p.includes('-')) { const [s,e] = p.split('-').map(Number); for(let i=Math.min(s,e); i<=Math.max(s,e); i++) if(i>0 && i<=state.pages.length) targets.push(i-1); }
-                    else { const n = Number(p); if(n>0 && n<=state.pages.length) targets.push(n-1); }
+                document.getElementById('range-input').value.split(/[,，]/).forEach(v => {
+                    const [s,e] = v.split('-').map(Number);
+                    if(e) for(let i=s; i<=e; i++) targets.push(i-1); else if(s) targets.push(s-1);
                 });
             }
-            targets.forEach(i => {
-                state.pages[i].cols = [...src.cols]; state.pages[i].rows = [...src.rows];
-                document.getElementById(`in-col-${i}`).value = src.cols.length+1; document.getElementById(`in-row-${i}`).value = src.rows.length+1;
-                if(state.pages[i].rendered) renderPageCanvas(i);
-            });
+            targets.forEach(i => { if(state.pages[i]) { state.pages[i].cols = [...src.cols]; state.pages[i].rows = [...src.rows]; document.getElementById(`in-col-${i}`).value = src.cols.length+1; document.getElementById(`in-row-${i}`).value = src.rows.length+1; if(state.pages[i].rendered) renderLines(i); } });
             closeCopyModal();
         };
 
-        // --- Console Logic (UI Only) ---
-        window.toggleAccordion = (id) => {
-            const content = document.getElementById(id);
-            const icon = document.getElementById('icon-' + id);
-            if (content.classList.contains('open')) {
-                content.classList.remove('open');
-                icon.classList.remove('open');
-            } else {
-                content.classList.add('open');
-                icon.classList.add('open');
-            }
-        };
+        window.toggleMobileSettings = () => { document.getElementById('settings-container').classList.toggle('closed'); document.getElementById('mobile-toggle-icon').classList.toggle('rotate-180'); };
+        window.setPreviewRotation = deg => { state.outputSettings.rotation = deg; document.querySelectorAll('.rot-btn').forEach(b => b.classList.toggle('bg-indigo-600', Number(b.dataset.val) === deg)); document.querySelectorAll('.rot-btn').forEach(b => b.classList.toggle('text-white', Number(b.dataset.val) === deg)); };
 
-        window.toggleMobileSettings = () => {
-            const container = document.getElementById('settings-container');
-            const icon = document.getElementById('mobile-toggle-icon');
-            if (container.classList.contains('closed')) {
-                container.classList.remove('closed');
-                container.classList.add('open');
-                icon.style.transform = 'rotate(180deg)';
-            } else {
-                container.classList.remove('open');
-                container.classList.add('closed');
-                icon.style.transform = 'rotate(0deg)';
-            }
-        };
-
-        window.setPreviewRotation = (deg) => {
-            state.outputSettings.rotation = parseInt(deg);
-            document.querySelectorAll('.rot-btn').forEach(b => {
-                const isActive = parseInt(b.dataset.val) === state.outputSettings.rotation;
-                if(isActive) {
-                    b.classList.add('bg-indigo-600', 'text-white', 'border-indigo-600');
-                    b.classList.remove('text-slate-600', 'border-slate-200');
-                } else {
-                    b.classList.remove('bg-indigo-600', 'text-white', 'border-indigo-600');
-                    b.classList.add('text-slate-600', 'border-slate-200');
-                }
-            });
+        // 每次点击预览都刷新
+        window.openPreviewConsole = () => { 
+            if(state.pages.length) { 
+                els.previewModal.classList.remove('hidden'); 
+                refreshPreview(); // 强制刷新
+            } 
         };
 
         window.refreshPreview = async () => {
-            // 1. Gather Settings
-            const sortOrder = document.getElementById('preview-order-select').value;
-            state.outputSettings.sortOrder = sortOrder;
-
-            // N-up Removed: Default to 1 (No merge)
-            state.outputSettings.mergeCount = 1;
-            state.outputSettings.layoutRows = 1;
-            state.outputSettings.layoutCols = 1;
-
-            // 2. Trigger Generation
-            state.previewPageNum = 1;
-            els.previewContent.innerHTML = '';
+            state.outputSettings.sortOrder = document.getElementById('preview-order-select').value;
+            state.previewPageNum = 1; els.previewContent.innerHTML = '';
             showLoading(t('loadingMagic'));
-            try {
-                // Give the UI a moment to show loading before heavy processing
-                setTimeout(async () => {
-                    try {
-                        state.previewPdfDoc = await generateFinalPDF();
-                        await renderMorePreview();
-                        // Close mobile settings on refresh for better UX
-                        if(window.innerWidth < 768) toggleMobileSettings(); 
-                    } catch (innerErr) {
-                         alert(innerErr.message);
-                         console.error(innerErr);
-                    } finally {
-                        hideLoading();
-                    }
-                }, 50);
-            } catch(e) { console.error(e); hideLoading(); }
+            setTimeout(async () => { try { state.previewPdfDoc = await generateFinalPDF(); await renderMorePreview(); } catch(e) { alert(e.message); } finally { hideLoading(); } }, 50);
         };
 
-        // =======================
-        // ✅ CORE PIPELINE ENGINE
-        // 物理流水线引擎（修复版）
-        // 原始页 → Crop → Sort → Rotate → Output
-        // =======================
-
-        class Slice {
-            constructor({ page, width, height, rotation = 0 }) {
-                this.page = page;     // PDFLib.Page object (from sanitized doc)
-                this.width = width;   // width from crop
-                this.height = height; // height from crop
-                this.rotation = rotation;
-            }
-        }
-
         async function generateFinalPDF() {
-            const { rotation, sortOrder } = state.outputSettings;
-            
-            // Cache loaded docs to avoid re-parsing for every slice (Fix OOM/Performance)
-            const docCache = {};
-            const getLoadedDoc = async (docId, file) => {
-                if (!docCache[docId]) {
-                    docCache[docId] = await PDFLib.PDFDocument.load(await file.arrayBuffer());
-                }
-                return docCache[docId];
-            };
-
-            /* ===============================
-               Phase 1: Crop (Physical)
-            =============================== */
-            const allSlices = [];
-
+            const out = await PDFLib.PDFDocument.create(), cache = {};
+            const slices = [];
             for (const p of state.pages) {
                 const d = state.documents.find(doc => doc.id === p.docId);
-                const srcPdf = await getLoadedDoc(p.docId, d.file);
-                // pageIndexInDoc is 1-based, getPages is 0-based
-                const srcPage = srcPdf.getPages()[p.pageIndexInDoc - 1];
-
-                const { width, height } = srcPage.getSize();
-
-                const cols = [0, ...p.cols.sort((a,b)=>a-b), 1];
-                const rows = [0, ...p.rows.sort((a,b)=>a-b), 1];
-
-                for (let r = 0; r < rows.length - 1; r++) {
-                    for (let c = 0; c < cols.length - 1; c++) {
-
-                        const x1 = cols[c] * width;
-                        const x2 = cols[c+1] * width;
-                        const y1 = height * (1 - rows[r+1]);
-                        const y2 = height * (1 - rows[r]);
-
-                        const w = x2 - x1;
-                        const h = y2 - y1;
-
-                        // Isolation Strategy: Create a fresh doc for every slice
-                        // This fixes 'node' error and cleans up page resources
-                        const sliceDoc = await PDFLib.PDFDocument.create();
-                        const [copied] = await sliceDoc.copyPages(srcPdf, [p.pageIndexInDoc - 1]);
-
-                        copied.setCropBox(x1, y1, w, h);
-                        
-                        sliceDoc.addPage(copied);
-
-                        // SANITIZATION: Save and Load to flatten structure
-                        const bytes = await sliceDoc.save();
-                        const cleanSliceDoc = await PDFLib.PDFDocument.load(bytes);
-                        const page = cleanSliceDoc.getPages()[0];
-
-                        allSlices.push(new Slice({
-                            page,
-                            width: w,
-                            height: h
-                        }));
+                if (!cache[p.docId]) cache[p.docId] = await PDFLib.PDFDocument.load(await d.file.arrayBuffer());
+                const srcPage = cache[p.docId].getPages()[p.pageIndexInDoc - 1], { width, height } = srcPage.getSize();
+                const cs = [0, ...p.cols.sort((a,b)=>a-b), 1], rs = [0, ...p.rows.sort((a,b)=>a-b), 1];
+                const pageSlices = [];
+                for(let r=0; r<rs.length-1; r++) {
+                    for(let c=0; c<cs.length-1; c++) {
+                        const x = cs[c]*width, y = height*(1-rs[r+1]), w = (cs[c+1]-cs[c])*width, h = (rs[r+1]-rs[r])*height;
+                        const sDoc = await PDFLib.PDFDocument.create();
+                        const [cp] = await sDoc.copyPages(cache[p.docId], [p.pageIndexInDoc-1]);
+                        cp.setCropBox(x, y, w, h); sDoc.addPage(cp);
+                        pageSlices.push(await PDFLib.PDFDocument.load(await sDoc.save()));
                     }
                 }
+                if (state.outputSettings.sortOrder === 'col') {
+                    const rowCount = rs.length-1, colCount = cs.length-1, reordered = [];
+                    for(let c=0; c<colCount; c++) for(let r=0; r<rowCount; r++) reordered.push(pageSlices[r*colCount + c]);
+                    slices.push(...reordered);
+                } else slices.push(...pageSlices);
             }
-
-            /* ===============================
-               Phase 2: Sort
-            =============================== */
-            let sortedSlices = [];
-
-            if (sortOrder === 'row') {
-                sortedSlices = allSlices;
-            } else {
-                // Col-major (N-order)
-                let currentIndex = 0;
-                for (const p of state.pages) {
-                     const numSlices = (p.cols.length + 1) * (p.rows.length + 1);
-                     const pageSlices = allSlices.slice(currentIndex, currentIndex + numSlices);
-                     currentIndex += numSlices;
-                     
-                     // Reshuffle from Row-Major to Col-Major
-                     const rCount = p.rows.length + 1;
-                     const cCount = p.cols.length + 1;
-                     // pageSlices is [r0c0, r0c1, r1c0, r1c1...]
-                     const colOrdered = [];
-                     for(let c=0; c<cCount; c++) {
-                         for(let r=0; r<rCount; r++) {
-                             colOrdered.push(pageSlices[r * cCount + c]);
-                         }
-                     }
-                     sortedSlices.push(...colOrdered);
-                }
-            }
-
-            /* ===============================
-               Phase 3: Rotate
-            =============================== */
-            // Apply rotation state to slices
-            sortedSlices.forEach(s => {
-                s.rotation = rotation || 0;
-            });
-
-            /* ===============================
-               Phase 4: Output (No Merge)
-            =============================== */
-            const out = await PDFLib.PDFDocument.create();
-            for (const s of sortedSlices) {
-                const [p] = await out.copyPages(s.page.doc, [0]);
-                p.setRotation(PDFLib.degrees(s.rotation)); // Simple metadata rotation is fine for single page output
-                out.addPage(p);
-            }
+            for (const s of slices) { const [p] = await out.copyPages(s, [0]); p.setRotation(PDFLib.degrees(state.outputSettings.rotation)); out.addPage(p); }
             return out;
         }
 
-        // --- Preview Modal UI ---
-        window.openPreviewConsole = () => {
-            if (!state.pages.length) return;
-            els.previewModal.classList.remove('hidden');
-            // Do NOT auto-refresh. Let user click button.
-            if (!state.previewPdfDoc) refreshPreview();
-        };
-
-        window.previewOutput = async () => openPreviewConsole();
-
         window.renderMorePreview = async () => {
-            if (!state.previewPdfDoc) return;
-            
-            const pdfBytes = await state.previewPdfDoc.save();
-            const loadingTask = pdfjsLib.getDocument({data: pdfBytes});
-            const pdf = await loadingTask.promise;
-            
-            const start = state.previewPageNum;
-            const end = Math.min(start + 1, pdf.numPages); 
-
-            if (start > pdf.numPages) {
-                els.previewMoreBtn.classList.add('hidden');
-                return;
-            }
-
+            const pdf = await pdfjsLib.getDocument(await state.previewPdfDoc.save()).promise, start = state.previewPageNum, end = Math.min(start + 1, pdf.numPages);
             for (let i = start; i <= end; i++) {
-                const page = await pdf.getPage(i);
-                const viewport = page.getViewport({ scale: 1.0 });
-                const containerW = els.previewContent.clientWidth || 600;
-                const scale = Math.min((containerW * 0.9) / viewport.width, 1.5);
-                const scaledViewport = page.getViewport({ scale });
-                
-                const canvas = document.createElement('canvas');
-                canvas.className = "preview-page bg-white shadow-lg shrink-0";
-                canvas.width = scaledViewport.width;
-                canvas.height = scaledViewport.height;
-                
-                await page.render({ canvasContext: canvas.getContext('2d'), viewport: scaledViewport }).promise;
+                const page = await pdf.getPage(i), vp = page.getViewport({ scale: 1.0 });
+                const scale = Math.min((els.previewContent.clientWidth*0.9)/vp.width, 1.5), svp = page.getViewport({ scale });
+                const canvas = document.createElement('canvas'); canvas.className = "bg-white shadow-lg shrink-0";
+                canvas.width = svp.width; canvas.height = svp.height;
+                await page.render({ canvasContext: canvas.getContext('2d'), viewport: svp }).promise;
                 els.previewContent.appendChild(canvas);
             }
-            
             state.previewPageNum = end + 1;
             els.previewMoreBtn.classList.toggle('hidden', state.previewPageNum > pdf.numPages);
-            els.previewMoreBtn.classList.toggle('flex', state.previewPageNum <= pdf.numPages);
         };
 
         window.closePreview = () => els.previewModal.classList.add('hidden');
-
         async function processAndDownload() {
-            if (!state.pages.length) return;
             showLoading(t('loadingMagic'));
             setTimeout(async () => {
                 try {
-                    const pdf = await generateFinalPDF();
-                    const b = await pdf.save();
-                    const link = document.createElement('a');
-                    link.href = URL.createObjectURL(new Blob([b], {type: 'application/pdf'}));
-                    link.download = `LittlePrince_Cut_${new Date().toISOString().slice(0,10)}.pdf`;
-                    link.click();
-                } catch(e) { alert(e.message); }
-                finally { hideLoading(); }
+                    const pdf = await generateFinalPDF(), link = document.createElement('a');
+                    link.href = URL.createObjectURL(new Blob([await pdf.save()], {type:'application/pdf'}));
+                    link.download = `LittlePrince_Cut_${new Date().toISOString().slice(0,10)}.pdf`; link.click();
+                } catch(e) { alert(e.message); } finally { hideLoading(); }
             }, 50);
         }
 
         window.resetAll = () => confirm(t('alertClear')) && location.reload();
-        function showLoading(t) { els.loadingText.textContent = t; els.loading.classList.remove('hidden'); }
+        function showLoading(txt) { els.loadingText.textContent = txt; els.loading.classList.remove('hidden'); }
         function hideLoading() { els.loading.classList.add('hidden'); }
+
+        let currentLang = 'zh';
+        const i18n = {
+            zh: { appTitle: "PDF 超级分割工具", appSubtitle: "小王子", addFile: "添加", download: "下载", preview: "预演", batchSettings: "批量分割", cols: "列数", rows: "行数", applyAll: "应用到全部", clickUpload: "点击添加 PDF 或图片", slogan: "小王子为你施展分割魔法", pdfcraftDesc: "极致轻便的 PDF 在线处理工具箱", pdf24Desc: "免费且功能强大的离线级工具", applySettings: "应用分割参数", allPages: "所有页面", currentFile: "仅当前文件", pageRange: "页码范围", confirmApply: "确认应用", loadingMagic: "正在施展魔法...", parsing: "正在解析...", copy: "复制", loading: "加载中...", alertParseError: "失败: ", alertClear: "确定清空吗？", previewConsole: "高级输出控制台", consoleDesc: "调整后刷新", close: "继续编辑", loadMore: "加载更多", sliceRotation: "切片旋转", sliceOrder: "切片排序", orderRow: "行优先 (Z字)", orderCol: "列优先 (N字)", refreshPreview: "刷新预览", downloadPDF: "下载 PDF", settingsToggle: "设置" },
+            en: { appTitle: "PDF Grid Cutter", appSubtitle: "Little Prince", addFile: "Add", download: "DL", preview: "Preview", batchSettings: "Batch", cols: "Cols", rows: "Rows", applyAll: "Apply All", clickUpload: "Click/Drag PDF or Images", slogan: "Little Prince casts splitting magic", pdfcraftDesc: "Lightweight PDF online toolbox", pdf24Desc: "Powerful Offline Tools", applySettings: "Apply Settings", allPages: "All Pages", currentFile: "Current File", pageRange: "Range", confirmApply: "Apply", loadingMagic: "Casting magic...", parsing: "Parsing...", copy: "Copy", loading: "Loading...", alertParseError: "Error: ", alertClear: "Clear all?", previewConsole: "Console", consoleDesc: "Refresh to apply", close: "Edit", loadMore: "Load More", sliceRotation: "Rotation", sliceOrder: "Order", orderRow: "Row Major", orderCol: "Col Major", refreshPreview: "Refresh", downloadPDF: "Download PDF", settingsToggle: "Settings" }
+        };
+        updateUI();
     </script>
 </body>
 </html>
