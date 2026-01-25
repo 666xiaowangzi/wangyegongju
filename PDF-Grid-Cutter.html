@@ -20,10 +20,8 @@
         .loading-overlay { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(8px); }
         .modal-enter { animation: pop 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
         @keyframes pop { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-        .accordion-content { transition: all 0.3s; max-height: 0; opacity: 0; overflow: hidden; }
-        .accordion-content.open { max-height: 500px; opacity: 1; }
         
-        /* 修复：添加移动端设置面板的动画样式 */
+        /* 移动端设置面板动画 */
         .mobile-settings-panel { transition: all 0.3s ease-in-out; overflow: hidden; max-height: 80vh; opacity: 1; }
         .mobile-settings-panel.closed { max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; }
         
@@ -106,35 +104,76 @@
     </div>
 
     <div id="preview-modal" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/90 p-4">
-        <div class="bg-white w-full max-w-6xl h-[90vh] rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden modal-enter">
+        <div class="bg-white w-full max-w-6xl h-[90vh] rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden modal-enter relative">
+            
+            <!-- Desktop Close Button (Top Right of Preview) - 保持不变 -->
+            <!-- Note: Layout is Sidebar (Left) -> Content (Right). Content has relative. -->
+            
             <div class="w-full md:w-80 bg-slate-50 border-r border-slate-200 flex flex-col shrink-0">
+                <!-- Mobile Header -->
                 <div class="p-4 border-b bg-white flex justify-between items-center cursor-pointer md:cursor-default" onclick="toggleMobileSettings()">
-                    <div><h3 class="font-bold text-lg text-slate-800" data-i18n="previewConsole">高级输出控制台</h3><p class="text-xs text-slate-400 hidden md:block" data-i18n="consoleDesc">调整参数后点击刷新</p></div>
-                    <div class="md:hidden flex items-center gap-2 text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg"><span class="text-xs font-bold" data-i18n="settingsToggle">设置</span><svg id="mobile-toggle-icon" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" stroke-width="2"></path></svg></div>
+                    <div>
+                        <h3 class="font-bold text-lg text-slate-800" data-i18n="previewConsole">高级输出控制台</h3>
+                        <p class="text-xs text-slate-400 hidden md:block" data-i18n="consoleDesc">调整参数后点击刷新</p>
+                    </div>
+                    
+                    <!-- Mobile Top Right Controls -->
+                    <div class="flex items-center gap-2 md:hidden">
+                        <!-- Settings Toggle -->
+                        <div class="flex items-center gap-2 text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg">
+                            <span class="text-xs font-bold" data-i18n="settingsToggle">设置</span>
+                            <svg id="mobile-toggle-icon" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" stroke-width="2"></path></svg>
+                        </div>
+                        
+                        <!-- NEW: Mobile Close (X) Button -->
+                        <button onclick="event.stopPropagation(); closePreview()" class="p-1.5 bg-slate-100 rounded-full text-slate-500 hover:bg-red-50 hover:text-red-500 transition ml-1">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
                 </div>
+                
                 <div id="settings-container" class="mobile-settings-panel flex-grow p-4 space-y-3 closed">
+                    <!-- 切片排序 (固定展开) -->
                     <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                        <button onclick="toggleAccordion('acc-order')" class="w-full px-4 py-3 flex items-center justify-between"><div class="flex items-center gap-2"><svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" stroke-width="2"></path></svg><span class="text-sm font-bold" data-i18n="sliceOrder">切片排序</span></div><svg id="icon-acc-order" class="w-4 h-4 text-slate-400 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7" stroke-width="2"></path></svg></button>
-                        <div id="acc-order" class="accordion-content"><div class="p-4"><select id="preview-order-select" class="w-full border rounded-lg px-3 py-2 text-sm font-bold"><option value="row" data-i18n="orderRow">行优先 (Z字形)</option><option value="col" data-i18n="orderCol">列优先 (N字形)</option></select></div></div>
+                        <div class="w-full px-4 py-3 flex items-center gap-2 border-b border-slate-100 bg-slate-50/50">
+                            <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" stroke-width="2"></path></svg>
+                            <span class="text-sm font-bold text-slate-700" data-i18n="sliceOrder">切片排序</span>
+                        </div>
+                        <div class="p-4">
+                            <select id="preview-order-select" class="w-full border rounded-lg px-3 py-2 text-sm font-bold"><option value="row" data-i18n="orderRow">行优先 (Z字形)</option><option value="col" data-i18n="orderCol">列优先 (N字形)</option></select>
+                        </div>
                     </div>
+                    
+                    <!-- 切片后旋转 (固定展开) -->
                     <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                        <button onclick="toggleAccordion('acc-rot')" class="w-full px-4 py-3 flex items-center justify-between"><div class="flex items-center gap-2"><svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-width="2"></path></svg><span class="text-sm font-bold" data-i18n="sliceRotation">切片后旋转</span></div><svg id="icon-acc-rot" class="w-4 h-4 text-slate-400 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 9l-7 7-7-7" stroke-width="2"></path></svg></button>
-                        <div id="acc-rot" class="accordion-content"><div class="p-4 flex gap-2"><button onclick="setPreviewRotation(0)" class="rot-btn flex-1 py-1.5 rounded-lg border text-xs font-bold bg-indigo-600 text-white" data-val="0">0°</button><button onclick="setPreviewRotation(90)" class="rot-btn flex-1 py-1.5 rounded-lg border text-xs font-bold" data-val="90">90°</button><button onclick="setPreviewRotation(180)" class="rot-btn flex-1 py-1.5 rounded-lg border text-xs font-bold" data-val="180">180°</button><button onclick="setPreviewRotation(270)" class="rot-btn flex-1 py-1.5 rounded-lg border text-xs font-bold" data-val="270">270°</button></div></div>
+                        <div class="w-full px-4 py-3 flex items-center gap-2 border-b border-slate-100 bg-slate-50/50">
+                            <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-width="2"></path></svg>
+                            <span class="text-sm font-bold text-slate-700" data-i18n="sliceRotation">切片后旋转</span>
+                        </div>
+                        <div class="p-4 flex gap-2">
+                            <button onclick="setPreviewRotation(0)" class="rot-btn flex-1 py-1.5 rounded-lg border text-xs font-bold bg-indigo-600 text-white" data-val="0">0°</button>
+                            <button onclick="setPreviewRotation(90)" class="rot-btn flex-1 py-1.5 rounded-lg border text-xs font-bold" data-val="90">90°</button>
+                            <button onclick="setPreviewRotation(180)" class="rot-btn flex-1 py-1.5 rounded-lg border text-xs font-bold" data-val="180">180°</button>
+                            <button onclick="setPreviewRotation(270)" class="rot-btn flex-1 py-1.5 rounded-lg border text-xs font-bold" data-val="270">270°</button>
+                        </div>
                     </div>
+                    
                     <button onclick="refreshPreview()" class="w-full py-3 bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2"><svg class="w-4 h-4 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-width="2"></path></svg><span data-i18n="refreshPreview">刷新预览 / 生效</span></button>
                 </div>
-                <!-- 移除了原有的移动端关闭按钮，合并到底部栏 -->
-                <div class="hidden p-4 border-t bg-white md:hidden"></div> 
+                <div class="hidden p-4 border-t bg-white md:hidden"></div>
             </div>
             <div class="flex-grow flex flex-col bg-slate-100 overflow-hidden relative">
+                <!-- Desktop Close Button (Kept as is) -->
+                <div class="absolute top-4 right-4 z-10 hidden md:block">
+                     <button onclick="closePreview()" class="bg-white/90 backdrop-blur p-2 rounded-full shadow hover:bg-red-50 text-slate-500 hover:text-red-500 transition">✕</button>
+                </div>
+
                 <div id="preview-content" class="flex-grow overflow-y-auto p-4 md:p-8 flex flex-col items-center gap-6"></div>
                 <div class="p-4 bg-white border-t flex justify-between items-center shrink-0 z-20">
                     <button id="preview-more-btn" onclick="renderMorePreview()" class="hidden px-4 py-2 text-indigo-600 text-sm font-bold flex items-center gap-2"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 13l-7 7-7-7" stroke-width="2"></path></svg><span data-i18n="loadMore">加载更多</span></button>
                     <div class="flex gap-2 ml-auto">
-                        <!-- 下载按钮放在左侧 -->
-                        <button onclick="processAndDownload()" class="px-4 md:px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl font-bold flex items-center gap-2"><span data-i18n="downloadPDF">下载 PDF</span></button>
-                        <!-- 继续编辑按钮放在右侧，并在移动端显示 -->
-                        <button onclick="closePreview()" class="px-3 md:px-5 py-2.5 text-slate-500 font-bold hover:bg-slate-100 rounded-xl transition" data-i18n="close">继续编辑</button>
+                        <!-- Removed Continue Edit Button (Moved to top right as X) -->
+                        <button onclick="processAndDownload()" class="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-indigo-200"><span data-i18n="downloadPDF">下载 PDF</span></button>
                     </div>
                 </div>
             </div>
@@ -299,9 +338,16 @@
             closeCopyModal();
         };
 
-        window.toggleAccordion = id => { document.getElementById(id).classList.toggle('open'); document.getElementById('icon-'+id).classList.toggle('rotate-180'); };
         window.toggleMobileSettings = () => { document.getElementById('settings-container').classList.toggle('closed'); document.getElementById('mobile-toggle-icon').classList.toggle('rotate-180'); };
         window.setPreviewRotation = deg => { state.outputSettings.rotation = deg; document.querySelectorAll('.rot-btn').forEach(b => b.classList.toggle('bg-indigo-600', Number(b.dataset.val) === deg)); document.querySelectorAll('.rot-btn').forEach(b => b.classList.toggle('text-white', Number(b.dataset.val) === deg)); };
+
+        // 每次点击预览都刷新
+        window.openPreviewConsole = () => { 
+            if(state.pages.length) { 
+                els.previewModal.classList.remove('hidden'); 
+                refreshPreview(); // 强制刷新
+            } 
+        };
 
         window.refreshPreview = async () => {
             state.outputSettings.sortOrder = document.getElementById('preview-order-select').value;
@@ -338,7 +384,6 @@
             return out;
         }
 
-        window.openPreviewConsole = () => { if(state.pages.length) { els.previewModal.classList.remove('hidden'); if(!state.previewPdfDoc) refreshPreview(); } };
         window.renderMorePreview = async () => {
             const pdf = await pdfjsLib.getDocument(await state.previewPdfDoc.save()).promise, start = state.previewPageNum, end = Math.min(start + 1, pdf.numPages);
             for (let i = start; i <= end; i++) {
