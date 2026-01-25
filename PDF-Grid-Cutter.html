@@ -22,6 +22,11 @@
         @keyframes pop { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         .accordion-content { transition: all 0.3s; max-height: 0; opacity: 0; overflow: hidden; }
         .accordion-content.open { max-height: 500px; opacity: 1; }
+        
+        /* 修复：添加移动端设置面板的动画样式 */
+        .mobile-settings-panel { transition: all 0.3s ease-in-out; overflow: hidden; max-height: 80vh; opacity: 1; }
+        .mobile-settings-panel.closed { max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; }
+        
         @media (min-width: 768px) { .mobile-settings-panel { display: block !important; max-height: none !important; opacity: 1 !important; } }
     </style>
 </head>
@@ -70,7 +75,7 @@
                 <div class="w-16 h-16 bg-indigo-50 text-indigo-500 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform"><svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
                 <h2 class="text-xl font-bold text-slate-700" data-i18n="clickUpload">点击添加 PDF 或图片</h2>
                 <p class="text-sm text-slate-400 mt-2" data-i18n="slogan">小王子为你施展分割魔法</p>
-                <div class="absolute inset-0 z-10" onclick="document.getElementById('add-file-input').click()"></div>
+                <div class="absolute inset-0 z-10"></div>
             </div>
             <div class="mt-8 space-y-3 px-2">
                 <a id="pdfcraft-link" href="https://pdfcraft.devtoolcafe.com/zh/" target="_blank" class="flex items-center justify-between p-4 bg-white rounded-2xl shadow-sm border border-slate-100 hover:border-indigo-200 transition-all">
