@@ -16,7 +16,20 @@
         .line-row { left: 0; right: 0; height: 2px; background: #3b82f6; cursor: row-resize; }
         .line-col::after { content: ''; position: absolute; left: -15px; right: -15px; top: 0; bottom: 0; }
         .line-row::after { content: ''; position: absolute; top: -15px; bottom: -15px; left: 0; right: 0; }
-        .active { box-shadow: 0 0 12px currentColor; background: currentColor; width: 4px; height: 4px; z-index: 60; }
+        
+        /* --- 修复与样式调整开始 --- */
+        /* 修改：强制高亮颜色为红色 #ef4444，不再跟随 currentColor */
+        .active { 
+            box-shadow: 0 0 12px #ef4444; 
+            background: #ef4444; 
+            z-index: 60; 
+        }
+        /* 竖线激活时，只加粗宽度 */
+        .line-col.active { width: 4px; }
+        /* 横线激活时，只加粗高度 */
+        .line-row.active { height: 4px; }
+        /* --- 修复与样式调整结束 --- */
+
         .loading-overlay { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(8px); }
         .modal-enter { animation: pop 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
         @keyframes pop { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
@@ -106,9 +119,6 @@
     <div id="preview-modal" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/90 p-4">
         <div class="bg-white w-full max-w-6xl h-[90vh] rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden modal-enter relative">
             
-            <!-- Desktop Close Button (Top Right of Preview) - 保持不变 -->
-            <!-- Note: Layout is Sidebar (Left) -> Content (Right). Content has relative. -->
-            
             <div class="w-full md:w-80 bg-slate-50 border-r border-slate-200 flex flex-col shrink-0">
                 <!-- Mobile Header -->
                 <div class="p-4 border-b bg-white flex justify-between items-center cursor-pointer md:cursor-default" onclick="toggleMobileSettings()">
@@ -125,7 +135,7 @@
                             <svg id="mobile-toggle-icon" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" stroke-width="2"></path></svg>
                         </div>
                         
-                        <!-- NEW: Mobile Close (X) Button -->
+                        <!-- Mobile Close (X) Button -->
                         <button onclick="event.stopPropagation(); closePreview()" class="p-1.5 bg-slate-100 rounded-full text-slate-500 hover:bg-red-50 hover:text-red-500 transition ml-1">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                         </button>
@@ -163,7 +173,7 @@
                 <div class="hidden p-4 border-t bg-white md:hidden"></div>
             </div>
             <div class="flex-grow flex flex-col bg-slate-100 overflow-hidden relative">
-                <!-- Desktop Close Button (Kept as is) -->
+                <!-- Desktop Close Button -->
                 <div class="absolute top-4 right-4 z-10 hidden md:block">
                      <button onclick="closePreview()" class="bg-white/90 backdrop-blur p-2 rounded-full shadow hover:bg-red-50 text-slate-500 hover:text-red-500 transition">✕</button>
                 </div>
@@ -172,7 +182,6 @@
                 <div class="p-4 bg-white border-t flex justify-between items-center shrink-0 z-20">
                     <button id="preview-more-btn" onclick="renderMorePreview()" class="hidden px-4 py-2 text-indigo-600 text-sm font-bold flex items-center gap-2"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 13l-7 7-7-7" stroke-width="2"></path></svg><span data-i18n="loadMore">加载更多</span></button>
                     <div class="flex gap-2 ml-auto">
-                        <!-- Removed Continue Edit Button (Moved to top right as X) -->
                         <button onclick="processAndDownload()" class="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-indigo-200"><span data-i18n="downloadPDF">下载 PDF</span></button>
                     </div>
                 </div>
@@ -410,7 +419,37 @@
             }, 50);
         }
 
-        window.resetAll = () => confirm(t('alertClear')) && location.reload();
+        /* --- 修改开始：重写 resetAll --- */
+        window.resetAll = () => {
+            if(!confirm(t('alertClear'))) return;
+            
+            // 1. 清空状态数据
+            state.documents = [];
+            state.pages = [];
+            state.nextDocId = 1;
+            state.drag = { active: false };
+            state.previewPdfDoc = null;
+            state.previewPageNum = 1;
+            
+            // 2. 清空 DOM 和输入框
+            els.pagesContainer.innerHTML = '';
+            els.fileInput.value = '';
+            
+            // 3. 恢复初始 UI 可见性 (显示上传区，隐藏列表和工具栏)
+            els.uploadArea.classList.remove('hidden');
+            els.pagesContainer.classList.add('hidden');
+            els.globalToolbar.classList.add('hidden');
+            els.bottomBar.classList.add('hidden');
+            els.previewModal.classList.add('hidden');
+            els.modal.classList.add('hidden');
+            els.loading.classList.add('hidden');
+            
+            // 4. 重置批量输入框
+            document.getElementById('global-col').value = 1;
+            document.getElementById('global-row').value = 1;
+        };
+        /* --- 修改结束 --- */
+
         function showLoading(txt) { els.loadingText.textContent = txt; els.loading.classList.remove('hidden'); }
         function hideLoading() { els.loading.classList.add('hidden'); }
 
