@@ -231,8 +231,32 @@
 
         async function renderPageCanvas(idx) {
             const p = state.pages[idx], doc = state.documents.find(d => d.id === p.docId), page = await doc.pdfDoc.getPage(p.pageIndexInDoc);
-            const cvs = $(`canvas-${idx}`), vp = page.getViewport({ scale: 1 }), s = Math.min(window.innerWidth - 32, 800) / vp.width, svp = page.getViewport({ scale: s });
-            cvs.height = svp.height; cvs.width = svp.width;
+            const cvs = $(`canvas-${idx}`);
+            const viewportRaw = page.getViewport({ scale: 1 });
+            
+            // 智能压缩逻辑：
+            // 如果页面总像素超过300万（约1500x2000），则判断为高清大图，使用0.4倍率渲染（牺牲清晰度换速度）
+            // 否则使用1.0倍率渲染（标准清晰度）
+            const totalPixels = viewportRaw.width * viewportRaw.height;
+            const isHighRes = totalPixels > 3000000;
+            
+            const visualWidth = Math.min(window.innerWidth - 32, 800);
+            const qualityRatio = isHighRes ? 0.4 : 1.0; 
+            
+            const renderScale = (visualWidth / viewportRaw.width) * qualityRatio;
+            const svp = page.getViewport({ scale: renderScale });
+            
+            cvs.width = svp.width; 
+            cvs.height = svp.height;
+            
+            // 视觉上拉伸占满，保证操作区域大小不变
+            cvs.style.width = "100%";
+            cvs.style.height = "auto";
+            
+            const container = cvs.parentElement;
+            container.style.width = `${visualWidth}px`;
+            container.style.maxWidth = '100%';
+
             await page.render({ canvasContext: cvs.getContext('2d'), viewport: svp }).promise;
             $(`ph-${idx}`).remove(); p.rendered = true; renderLines(idx);
         }
@@ -309,9 +333,28 @@
         window.renderMorePreview = async (count=1) => {
             const pdf = await pdfjsLib.getDocument(await state.previewPdfDoc.save()).promise, end = Math.min(state.previewPageNum + count - 1, pdf.numPages);
             for (let i = state.previewPageNum; i <= end; i++) {
-                const p = await pdf.getPage(i), s = Math.min((els.previewContent.clientWidth*0.9)/p.getViewport({scale:1}).width, 1.5), cvs = document.createElement('canvas');
-                const svp = p.getViewport({ scale: s }); cvs.className = "bg-white shadow-lg shrink-0"; cvs.width = svp.width; cvs.height = svp.height;
-                await p.render({ canvasContext: cvs.getContext('2d'), viewport: svp }).promise; els.previewContent.appendChild(cvs);
+                const p = await pdf.getPage(i);
+                // 同样的智能压缩逻辑应用于预览
+                const viewportRaw = p.getViewport({ scale: 1 });
+                const totalPixels = viewportRaw.width * viewportRaw.height;
+                const isHighRes = totalPixels > 3000000;
+
+                const containerWidth = els.previewContent.clientWidth * 0.9;
+                const qualityRatio = isHighRes ? 0.4 : 1.0;
+                const renderScale = (containerWidth / viewportRaw.width) * qualityRatio;
+
+                const cvs = document.createElement('canvas');
+                const svp = p.getViewport({ scale: renderScale }); 
+                
+                cvs.className = "bg-white shadow-lg shrink-0"; 
+                cvs.width = svp.width; 
+                cvs.height = svp.height;
+                cvs.style.width = "100%"; // 视觉占满
+                cvs.style.height = "auto";
+                cvs.style.maxWidth = `${containerWidth}px`; 
+
+                await p.render({ canvasContext: cvs.getContext('2d'), viewport: svp }).promise; 
+                els.previewContent.appendChild(cvs);
             }
             state.previewPageNum = end + 1; els.previewMoreBtn.classList.toggle('hidden', state.previewPageNum > pdf.numPages);
         };
