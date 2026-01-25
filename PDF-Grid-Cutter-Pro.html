@@ -17,18 +17,18 @@
         .line-col::after { content: ''; position: absolute; left: -15px; right: -15px; top: 0; bottom: 0; }
         .line-row::after { content: ''; position: absolute; top: -15px; bottom: -15px; left: 0; right: 0; }
         
-        /* --- 修复部分开始 --- */
-        /* 原来的 .active 会强制宽高为4px导致线条变成点，现已修复 */
+        /* --- 修复与样式调整开始 --- */
+        /* 修改：强制高亮颜色为红色 #ef4444，不再跟随 currentColor */
         .active { 
-            box-shadow: 0 0 12px currentColor; 
-            background: currentColor; 
+            box-shadow: 0 0 12px #ef4444; 
+            background: #ef4444; 
             z-index: 60; 
         }
         /* 竖线激活时，只加粗宽度 */
         .line-col.active { width: 4px; }
         /* 横线激活时，只加粗高度 */
         .line-row.active { height: 4px; }
-        /* --- 修复部分结束 --- */
+        /* --- 修复与样式调整结束 --- */
 
         .loading-overlay { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(8px); }
         .modal-enter { animation: pop 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
@@ -59,8 +59,17 @@
                     <span id="lang-text">EN</span>
                 </button>
                 <div class="hidden md:flex items-center gap-2">
-                    <button onclick="document.getElementById('add-file-input').click()" class="bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1.5 rounded-lg text-xs font-bold" data-i18n="addFile">添加</button>
-                    <button onclick="openPreviewConsole()" class="bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-1.5 rounded-lg text-xs font-bold" data-i18n="preview">预演</button>
+                    <!-- 修改：添加图标，并将 data-i18n 移至 span 内部，防止 updateUI 覆盖图标 -->
+                    <button onclick="document.getElementById('add-file-input').click()" class="bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                        <span data-i18n="addFile">添加</span>
+                    </button>
+                    <!-- 修改：预演图标，并将 data-i18n 移至 span 内部 -->
+                    <button onclick="openPreviewConsole()" class="bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                        <span data-i18n="preview">预演</span>
+                    </button>
+                    <!-- 下载按钮保持不变 -->
                     <button onclick="processAndDownload()" class="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold shadow-md" data-i18n="download">下载</button>
                     <button onclick="resetAll()" class="text-slate-400 p-1.5 hover:text-red-500" title="清空"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
                 </div>
@@ -180,7 +189,8 @@
 
                 <div id="preview-content" class="flex-grow overflow-y-auto p-4 md:p-8 flex flex-col items-center gap-6"></div>
                 <div class="p-4 bg-white border-t flex justify-between items-center shrink-0 z-20">
-                    <button id="preview-more-btn" onclick="renderMorePreview()" class="hidden px-4 py-2 text-indigo-600 text-sm font-bold flex items-center gap-2"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 13l-7 7-7-7" stroke-width="2"></path></svg><span data-i18n="loadMore">加载更多</span></button>
+                    <!-- 修改：点击加载更多，默认加载10张 -->
+                    <button id="preview-more-btn" onclick="renderMorePreview(10)" class="hidden px-4 py-2 text-indigo-600 text-sm font-bold flex items-center gap-2"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 13l-7 7-7-7" stroke-width="2"></path></svg><span data-i18n="loadMore">加载更多</span></button>
                     <div class="flex gap-2 ml-auto">
                         <button onclick="processAndDownload()" class="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-indigo-200"><span data-i18n="downloadPDF">下载 PDF</span></button>
                     </div>
@@ -362,7 +372,7 @@
             state.outputSettings.sortOrder = document.getElementById('preview-order-select').value;
             state.previewPageNum = 1; els.previewContent.innerHTML = '';
             showLoading(t('loadingMagic'));
-            setTimeout(async () => { try { state.previewPdfDoc = await generateFinalPDF(); await renderMorePreview(); } catch(e) { alert(e.message); } finally { hideLoading(); } }, 50);
+            setTimeout(async () => { try { state.previewPdfDoc = await generateFinalPDF(); await renderMorePreview(5); /* 修改：初始加载5页 */ } catch(e) { alert(e.message); } finally { hideLoading(); } }, 50);
         };
 
         async function generateFinalPDF() {
@@ -393,8 +403,10 @@
             return out;
         }
 
-        window.renderMorePreview = async () => {
-            const pdf = await pdfjsLib.getDocument(await state.previewPdfDoc.save()).promise, start = state.previewPageNum, end = Math.min(start + 1, pdf.numPages);
+        /* 修改：增加 count 参数，支持自定义加载数量 */
+        window.renderMorePreview = async (count) => {
+            const batchSize = typeof count === 'number' ? count : 1;
+            const pdf = await pdfjsLib.getDocument(await state.previewPdfDoc.save()).promise, start = state.previewPageNum, end = Math.min(start + batchSize - 1, pdf.numPages);
             for (let i = start; i <= end; i++) {
                 const page = await pdf.getPage(i), vp = page.getViewport({ scale: 1.0 });
                 const scale = Math.min((els.previewContent.clientWidth*0.9)/vp.width, 1.5), svp = page.getViewport({ scale });
@@ -419,7 +431,37 @@
             }, 50);
         }
 
-        window.resetAll = () => confirm(t('alertClear')) && location.reload();
+        /* --- 修改开始：重写 resetAll --- */
+        window.resetAll = () => {
+            if(!confirm(t('alertClear'))) return;
+            
+            // 1. 清空状态数据
+            state.documents = [];
+            state.pages = [];
+            state.nextDocId = 1;
+            state.drag = { active: false };
+            state.previewPdfDoc = null;
+            state.previewPageNum = 1;
+            
+            // 2. 清空 DOM 和输入框
+            els.pagesContainer.innerHTML = '';
+            els.fileInput.value = '';
+            
+            // 3. 恢复初始 UI 可见性 (显示上传区，隐藏列表和工具栏)
+            els.uploadArea.classList.remove('hidden');
+            els.pagesContainer.classList.add('hidden');
+            els.globalToolbar.classList.add('hidden');
+            els.bottomBar.classList.add('hidden');
+            els.previewModal.classList.add('hidden');
+            els.modal.classList.add('hidden');
+            els.loading.classList.add('hidden');
+            
+            // 4. 重置批量输入框
+            document.getElementById('global-col').value = 1;
+            document.getElementById('global-row').value = 1;
+        };
+        /* --- 修改结束 --- */
+
         function showLoading(txt) { els.loadingText.textContent = txt; els.loading.classList.remove('hidden'); }
         function hideLoading() { els.loading.classList.add('hidden'); }
 
