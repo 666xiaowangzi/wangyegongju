@@ -20,13 +20,28 @@
         .line-row.active { box-shadow: 0 0 12px #3b82f6; background: #3b82f6; z-index: 60; }
         .modal-enter { animation: pop 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
         @keyframes pop { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        
         .mobile-settings-panel { transition: all 0.3s ease-in-out; overflow: hidden; max-height: 80vh; opacity: 1; }
         .mobile-settings-panel.closed { max-height: 0; opacity: 0; padding: 0; }
-        @media (min-width: 768px) { .mobile-settings-panel { display: block !important; max-height: none !important; opacity: 1 !important; } }
+        
+        /* 核心修复：电脑端强制展开并恢复内边距 */
+        @media (min-width: 768px) { 
+            .mobile-settings-panel { 
+                display: block !important; 
+                max-height: none !important; 
+                opacity: 1 !important; 
+                padding: 1rem !important; /* 强制恢复 p-4 的内边距 */
+            } 
+            .mobile-settings-panel.closed {
+                padding: 1rem !important; /* 覆盖 closed 类的 padding: 0 */
+            }
+        }
+        
         .stepper-btn:active { transform: scale(0.92); background-color: #f1f5f9; }
         .preset-btn { transition: all 0.2s; border: 2px solid transparent; }
         .preset-btn:hover { border-color: #e0e7ff; background-color: #f5f3ff; }
         .preset-btn:active { transform: scale(0.95); }
+        .preset-icon { border-color: currentColor; }
         .preset-card { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); border: 2px solid #e2e8f0; }
         .preset-card:hover { border-color: #818cf8; background-color: #f5f3ff; transform: translateY(-2px); }
         .preset-card.selected { border-color: #4f46e5; background-color: #eef2ff; ring: 2px solid #4f46e5; }
@@ -168,6 +183,7 @@
             <div class="relative w-16 h-16 mb-6"><div class="absolute inset-0 border-4 border-indigo-100 rounded-full"></div><div class="absolute inset-0 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div></div>
             <p id="loading-text" class="text-slate-800 font-bold text-lg mb-4 text-center" data-i18n="loadingMagic">正在施展分割魔法...</p>
             <div class="w-full bg-slate-100 rounded-full h-2 mb-2 overflow-hidden"><div id="loading-bar" class="bg-indigo-600 h-2 rounded-full transition-all duration-300 w-0"></div></div>
+            <p id="loading-percent" class="text-xs text-slate-400 font-mono mb-6 hidden">0%</p>
         </div>
     </div>
 
@@ -184,7 +200,7 @@
         var state = { documents: [], pages: [], nextDocId: 1, drag: { active: false }, outputSettings: { rotation: 0, sortOrder: 'row' }, previewPdfDoc: null, previewPageNum: 1, copySourceIndex: -1, processing: { cancelled: false }, renderTasks: {}, previewCursor: 0, previewLoading: false };
         const $ = id => document.getElementById(id);
         const $$ = n => Array.from({length: n-1}, (_, i) => (i+1)/n);
-        const els = { fileInput: $('add-file-input'), uploadArea: $('upload-area'), dropZone: $('drop-zone'), pagesContainer: $('pages-container'), loading: $('loading'), loadingText: $('loading-text'), loadingBar: $('loading-bar'), modal: $('copy-modal'), previewModal: $('preview-modal'), previewContent: $('preview-content'), previewMoreBtn: $('preview-more-btn'), globalToolbar: $('global-toolbar'), bottomBar: $('bottom-bar') };
+        const els = { fileInput: $('add-file-input'), uploadArea: $('upload-area'), dropZone: $('drop-zone'), pagesContainer: $('pages-container'), loading: $('loading'), loadingText: $('loading-text'), loadingBar: $('loading-bar'), loadingPercent: $('loading-percent'), modal: $('copy-modal'), previewModal: $('preview-modal'), previewContent: $('preview-content'), previewMoreBtn: $('preview-more-btn'), globalToolbar: $('global-toolbar'), bottomBar: $('bottom-bar') };
         let currentLang = 'zh';
         const i18n = { zh: { appTitle: "PDF 超级分割工具", appSubtitle: "小王子", addFile: "添加", download: "下载", preview: "预演", batchSettings: "批量分割", batchDesc: "一键应用设置", cols: "列数", rows: "行数", applyAll: "应用设置", clickUpload: "点击或拖拽添加 PDF 或图片", slogan: "小王子为你施展分割魔法", pdfcraftDesc: "极致轻便的 PDF 在线处理工具箱", pdf24Desc: "免费且功能强大的离线级工具", applySettings: "应用分割参数", allPages: "所有页面", currentFile: "仅当前文件", pageRange: "页码范围", confirmApply: "确认应用", loadingMagic: "正在施展魔法...", parsing: "正在解析...", copy: "复制", loading: "加载中...", alertParseError: "失败: ", alertClear: "确定清空吗？", previewConsole: "高级输出控制台", consoleDesc: "调整后刷新", close: "继续编辑", loadMore: "加载更多", sliceRotation: "切片旋转", sliceOrder: "切片排序", orderRow: "行优先 (Z字)", orderCol: "列优先 (N字)", refreshPreview: "刷新预览", previewing: "正在生成预览...", downloadPDF: "下载 PDF", settingsToggle: "设置", cancel: "停止操作", cancelled: "操作已取消" }, en: { appTitle: "PDF Grid Cutter", appSubtitle: "Little Prince", addFile: "Add", download: "DL", preview: "Preview", batchSettings: "Batch", batchDesc: "Apply to all pages", cols: "Cols", rows: "Rows", applyAll: "Apply All", clickUpload: "Click/Drag PDF or Images", slogan: "Little Prince casts splitting magic", pdfcraftDesc: "Lightweight PDF online toolbox", pdf24Desc: "Powerful Offline Tools", applySettings: "Apply Settings", allPages: "All Pages", currentFile: "Current File", pageRange: "Range", confirmApply: "Apply", loadingMagic: "Casting magic...", parsing: "Parsing...", copy: "Copy", loading: "Loading...", alertParseError: "Error: ", alertClear: "Clear all?", previewConsole: "Console", consoleDesc: "Refresh to apply", close: "Edit", loadMore: "Load More", sliceRotation: "Rotation", sliceOrder: "Order", orderRow: "Row Major", orderCol: "Col Major", refreshPreview: "Refresh", previewing: "Generating Preview...", downloadPDF: "Download PDF", settingsToggle: "Settings", cancel: "Cancel", cancelled: "Operation Cancelled" } };
         const tr = k => i18n[currentLang][k] || k;
@@ -335,7 +351,11 @@
             closeCopyModal();
         };
 
-        window.toggleMobileSettings = () => { $('settings-container').classList.toggle('closed'); $('mobile-toggle-icon').classList.toggle('rotate-180'); };
+        window.toggleMobileSettings = () => { 
+            if (window.innerWidth >= 768) return; 
+            $('settings-container').classList.toggle('closed'); 
+            $('mobile-toggle-icon').classList.toggle('rotate-180'); 
+        };
         window.setPreviewRotation = deg => { state.outputSettings.rotation = deg; document.querySelectorAll('.rot-btn').forEach(b => { b.classList.toggle('bg-indigo-600', +b.dataset.val===deg); b.classList.toggle('text-white', +b.dataset.val===deg); }); };
         window.openPreviewConsole = () => { if(state.pages.length) { els.previewModal.classList.remove('hidden'); refreshPreview(); } };
         window.refreshPreview = () => { state.outputSettings.sortOrder = $('preview-order-select').value; state.previewPageNum = 1; state.previewCursor = 0; els.previewContent.innerHTML = ''; loadPreviewBatch(); };
