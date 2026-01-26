@@ -121,7 +121,7 @@
             
             <div class="h-px bg-slate-100 w-full"></div>
 
-            <!-- 手动控制区 (布局优化：电脑端强制不换行，按钮高度修复) -->
+            <!-- 手动控制区 -->
             <div class="flex flex-col md:flex-row md:flex-nowrap items-center gap-3 w-full">
                 <div class="flex-grow grid grid-cols-2 gap-3 w-full md:w-auto">
                     <div class="bg-white border border-slate-100 rounded-2xl p-1.5 flex items-center justify-between shadow-sm h-[50px] box-border">
@@ -282,7 +282,8 @@
             previewPdfDoc: null, 
             previewPageNum: 1, 
             copySourceIndex: -1,
-            processing: { cancelled: false } 
+            processing: { cancelled: false },
+            renderTasks: {} // Add this
         };
         
         function $(id) { return document.getElementById(id); }
@@ -435,19 +436,58 @@
         }
 
         async function renderPageCanvas(idx) {
+            // Cancel any pending render task for this page
+            if (state.renderTasks[idx]) {
+                state.renderTasks[idx].cancel();
+                delete state.renderTasks[idx];
+            }
+
             try {
-                const p = state.pages[idx], doc = state.documents.find(d => d.id === p.docId), page = await doc.pdfDoc.getPage(p.pageIndexInDoc);
+                const p = state.pages[idx];
+                // Check if page/doc still exists
+                if (!p) return;
+                
+                const doc = state.documents.find(d => d.id === p.docId);
+                if (!doc) return;
+
+                const page = await doc.pdfDoc.getPage(p.pageIndexInDoc);
+                
+                // Race condition check: Did another call start rendering while we were waiting for getPage?
+                if (state.renderTasks[idx]) {
+                    state.renderTasks[idx].cancel();
+                }
+
                 const cvs = $(`canvas-${idx}`);
+                if (!cvs) return; // Canvas might be gone
+
+                // ... viewport calc ...
                 const viewportRaw = page.getViewport({ scale: 1 });
                 const isHighRes = (viewportRaw.width * viewportRaw.height) > 3000000;
                 const visualWidth = Math.min(window.innerWidth - 32, 800);
                 const svp = page.getViewport({ scale: (visualWidth / viewportRaw.width) * (isHighRes ? 0.6 : 1.2) }); 
+                
                 cvs.width = svp.width; cvs.height = svp.height;
                 cvs.style.width = "100%"; cvs.style.height = "auto";
                 cvs.parentElement.style.width = `${visualWidth}px`; cvs.parentElement.style.maxWidth = '100%';
-                await page.render({ canvasContext: cvs.getContext('2d'), viewport: svp }).promise;
-                $(`ph-${idx}`).remove(); p.rendered = true; renderLines(idx);
-            } catch(e) { console.error("Render failed", e); }
+                
+                // Keep track of the render task
+                const renderContext = { canvasContext: cvs.getContext('2d'), viewport: svp };
+                const renderTask = page.render(renderContext);
+                state.renderTasks[idx] = renderTask;
+
+                await renderTask.promise;
+                
+                // Cleanup
+                delete state.renderTasks[idx];
+                
+                $(`ph-${idx}`).remove(); 
+                p.rendered = true; 
+                renderLines(idx);
+            } catch(e) { 
+                if (e.name !== 'RenderingCancelledException') {
+                    console.error("Render failed", e); 
+                }
+            }
         }
 
         function renderLines(idx) {
