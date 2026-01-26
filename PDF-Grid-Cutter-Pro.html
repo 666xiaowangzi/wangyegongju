@@ -121,7 +121,7 @@
             
             <div class="h-px bg-slate-100 w-full"></div>
 
-            <!-- 手动控制区 -->
+            <!-- 手动控制区 (布局优化：电脑端强制不换行，按钮高度修复) -->
             <div class="flex flex-col md:flex-row md:flex-nowrap items-center gap-3 w-full">
                 <div class="flex-grow grid grid-cols-2 gap-3 w-full md:w-auto">
                     <div class="bg-white border border-slate-100 rounded-2xl p-1.5 flex items-center justify-between shadow-sm h-[50px] box-border">
@@ -226,7 +226,10 @@
                 <div class="absolute top-4 right-4 z-10 hidden md:block"><button onclick="closePreview()" class="bg-white/90 backdrop-blur p-2 rounded-full shadow hover:bg-red-50 text-slate-500 hover:text-red-500 transition">✕</button></div>
                 <div id="preview-content" class="flex-grow overflow-y-auto p-4 md:p-8 flex flex-col items-center gap-6"></div>
                 <div class="p-4 bg-white border-t flex justify-between items-center shrink-0 z-20">
-                    <button id="preview-more-btn" onclick="renderMorePreview(10)" class="hidden px-4 py-2 text-indigo-600 text-sm font-bold flex items-center gap-2"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 13l-7 7-7-7" stroke-width="2"></path></svg><span data-i18n="loadMore">加载更多</span></button>
+                    <button id="preview-more-btn" onclick="loadPreviewBatch()" class="hidden w-full md:w-auto px-6 py-2.5 bg-white border border-slate-200 text-indigo-600 text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-50 rounded-xl transition-all shadow-sm">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 13l-7 7-7-7" stroke-width="2"></path></svg>
+                        <span data-i18n="loadMore">加载更多</span>
+                    </button>
                     <div class="flex gap-2 ml-auto"><button onclick="processAndDownload()" class="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-indigo-200"><span data-i18n="downloadPDF">下载 PDF</span></button></div>
                 </div>
             </div>
@@ -283,7 +286,10 @@
             previewPageNum: 1, 
             copySourceIndex: -1,
             processing: { cancelled: false },
-            renderTasks: {} // Add this
+            renderTasks: {},
+            // 新增状态：控制按需预览
+            previewCursor: 0,
+            previewLoading: false
         };
         
         function $(id) { return document.getElementById(id); }
@@ -331,8 +337,21 @@
 
         els.dropZone.onclick = () => els.fileInput.click();
         els.fileInput.onchange = e => handleFiles(e.target.files);
-        els.dropZone.ondrop = e => { e.preventDefault(); handleFiles(e.dataTransfer.files); };
+        // 修改1: 移除 specific drop listener, 避免冲突
+        els.dropZone.ondrop = e => { e.preventDefault(); e.stopPropagation(); els.dropZone.classList.remove('border-indigo-500'); handleFiles(e.dataTransfer.files); };
         ['dragover', 'dragenter'].forEach(v => els.dropZone['on'+v] = e => { e.preventDefault(); els.dropZone.classList.add('border-indigo-500'); });
+        
+        // 修改2: 全局拖拽支持
+        window.addEventListener('dragover', e => e.preventDefault());
+        window.addEventListener('drop', e => {
+            e.preventDefault();
+            // 防止重复处理（如果落在dropZone内，已经被上面的监听器处理了）
+            if(els.dropZone.contains(e.target) && !els.dropZone.closest('#upload-area').classList.contains('hidden')) return;
+            
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                handleFiles(e.dataTransfer.files);
+            }
+        });
 
         async function handleFiles(files) {
             if (!files.length) return;
@@ -346,14 +365,20 @@
             }, 60000);
 
             try {
-                // Remove Promise.race wrapper
-                [els.uploadArea, els.pagesContainer, els.globalToolbar, els.bottomBar].forEach(el => el.classList.toggle('hidden', el === els.uploadArea));
+                [els.uploadArea, els.pagesContainer, els.globalToolbar, els.bottomBar].forEach(el => el.classList.toggle('hidden', el === els.uploadArea && state.documents.length === 0)); // 逻辑修改：只有当没有文档时才显示upload area，否则一直保持main区域显示
                 
+                // 如果已经有文件，确保主界面显示
+                if(state.documents.length > 0) {
+                    els.uploadArea.classList.add('hidden');
+                    els.pagesContainer.classList.remove('hidden');
+                    els.globalToolbar.classList.remove('hidden');
+                    if (window.innerWidth < 768) els.bottomBar.classList.remove('hidden');
+                }
+
                 for (const file of files) {
                     let doc = null, storage = file;
                     if (file.type === 'application/pdf') doc = await pdfjsLib.getDocument(await file.arrayBuffer()).promise;
                     else if (file.type.startsWith('image/')) {
-                        // 2. 处理图片：统一使用 Canvas 转换逻辑，解决 SOI not found 问题
                         const bytes = await imageToPdfBytes(file);
                         storage = new Blob([bytes], {type:'application/pdf'}); storage.name = file.name;
                         doc = await pdfjsLib.getDocument(bytes).promise;
@@ -370,8 +395,9 @@
                 }
             } catch (e) { 
                 alert(t('alertParseError') + e.message);
-                // 出错时恢复 UI
-                [els.uploadArea, els.pagesContainer, els.globalToolbar, els.bottomBar].forEach(el => el.classList.toggle('hidden', el !== els.uploadArea));
+                if(state.documents.length === 0) {
+                     [els.uploadArea, els.pagesContainer, els.globalToolbar, els.bottomBar].forEach(el => el.classList.toggle('hidden', el !== els.uploadArea));
+                }
             } finally { 
                 clearTimeout(slowMsgTimer);
                 hideLoading(); 
@@ -379,7 +405,6 @@
             }
         }
 
-        // 2. 增强版图片处理：使用 Canvas 归一化，支持更多格式
         async function imageToPdfBytes(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -388,19 +413,11 @@
                         const pdf = await PDFLib.PDFDocument.create();
                         const img = new Image();
                         img.src = reader.result;
-                        await img.decode(); // 等待图片解码
-
-                        // 使用 Canvas 将所有图片统一转为标准 PNG，解决格式兼容问题
+                        await img.decode();
                         const canvas = document.createElement('canvas');
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0);
-                        
-                        // 转为 PNG 数据流
-                        const pngUrl = canvas.toDataURL('image/png');
-                        const pngImageBytes = await fetch(pngUrl).then(res => res.arrayBuffer());
-                        
+                        canvas.width = img.width; canvas.height = img.height;
+                        canvas.getContext('2d').drawImage(img, 0, 0);
+                        const pngImageBytes = await fetch(canvas.toDataURL('image/png')).then(res => res.arrayBuffer());
                         const embeddedImg = await pdf.embedPng(pngImageBytes);
                         const page = pdf.addPage([img.width, img.height]);
                         page.drawImage(embeddedImg, { x: 0, y: 0, width: img.width, height: img.height });
@@ -421,10 +438,7 @@
             card.className = "bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden";
             card.innerHTML = `<div class="bg-slate-50/80 border-b p-3 flex justify-between items-center">
                     <div class="flex flex-col md:flex-row md:items-center gap-1 md:gap-3 truncate">
-                        <div class="flex items-center gap-2">
-                            <span class="w-6 h-6 bg-white rounded-full flex items-center justify-center text-xs font-bold">${idx+1}</span>
-                            <span class="text-xs text-slate-500 font-bold truncate max-w-[120px]">${d.fileName}</span>
-                        </div>
+                        <div class="flex items-center gap-2"><span class="w-6 h-6 bg-white rounded-full flex items-center justify-center text-xs font-bold">${idx+1}</span><span class="text-xs text-slate-500 font-bold truncate max-w-[120px]">${d.fileName}</span></div>
                         <span class="text-[10px] text-slate-400 font-mono bg-slate-100 px-1.5 py-0.5 rounded hidden md:inline-block">${d.fileSize}</span>
                     </div>
                     <div class="flex items-center gap-2">
@@ -436,58 +450,26 @@
         }
 
         async function renderPageCanvas(idx) {
-            // Cancel any pending render task for this page
-            if (state.renderTasks[idx]) {
-                state.renderTasks[idx].cancel();
-                delete state.renderTasks[idx];
-            }
-
+            if (state.renderTasks[idx]) { state.renderTasks[idx].cancel(); delete state.renderTasks[idx]; }
             try {
-                const p = state.pages[idx];
-                // Check if page/doc still exists
-                if (!p) return;
-                
-                const doc = state.documents.find(d => d.id === p.docId);
-                if (!doc) return;
-
+                const p = state.pages[idx]; if (!p) return;
+                const doc = state.documents.find(d => d.id === p.docId); if (!doc) return;
                 const page = await doc.pdfDoc.getPage(p.pageIndexInDoc);
-                
-                // Race condition check: Did another call start rendering while we were waiting for getPage?
-                if (state.renderTasks[idx]) {
-                    state.renderTasks[idx].cancel();
-                }
-
-                const cvs = $(`canvas-${idx}`);
-                if (!cvs) return; // Canvas might be gone
-
-                // ... viewport calc ...
+                if (state.renderTasks[idx]) state.renderTasks[idx].cancel();
+                const cvs = $(`canvas-${idx}`); if (!cvs) return;
                 const viewportRaw = page.getViewport({ scale: 1 });
                 const isHighRes = (viewportRaw.width * viewportRaw.height) > 3000000;
                 const visualWidth = Math.min(window.innerWidth - 32, 800);
                 const svp = page.getViewport({ scale: (visualWidth / viewportRaw.width) * (isHighRes ? 0.6 : 1.2) }); 
-                
                 cvs.width = svp.width; cvs.height = svp.height;
                 cvs.style.width = "100%"; cvs.style.height = "auto";
                 cvs.parentElement.style.width = `${visualWidth}px`; cvs.parentElement.style.maxWidth = '100%';
-                
-                // Keep track of the render task
-                const renderContext = { canvasContext: cvs.getContext('2d'), viewport: svp };
-                const renderTask = page.render(renderContext);
+                const renderTask = page.render({ canvasContext: cvs.getContext('2d'), viewport: svp });
                 state.renderTasks[idx] = renderTask;
-
                 await renderTask.promise;
-                
-                // Cleanup
                 delete state.renderTasks[idx];
-                
-                $(`ph-${idx}`).remove(); 
-                p.rendered = true; 
-                renderLines(idx);
-            } catch(e) { 
-                if (e.name !== 'RenderingCancelledException') {
-                    console.error("Render failed", e); 
-                }
-            }
+                $(`ph-${idx}`).remove(); p.rendered = true; renderLines(idx);
+            } catch(e) { if (e.name !== 'RenderingCancelledException') console.error("Render failed", e); }
         }
 
         function renderLines(idx) {
@@ -516,26 +498,10 @@
         };
         
         window.stepGlobal = (type, delta) => {
-            const el = $(`global-${type}`);
-            let val = parseInt(el.value) || 1;
-            val = Math.max(1, val + delta);
-            el.value = val;
+            const el = $(`global-${type}`); let val = parseInt(el.value) || 1; val = Math.max(1, val + delta); el.value = val;
         };
-
-        // 新增：快捷预设应用
-        window.setPreset = (c, r) => {
-            $(`global-col`).value = c;
-            $(`global-row`).value = r;
-            applyGlobalDirect();
-        }
-        
-        // 预览控制台中的预设
-        window.setPreviewPreset = (c, r) => {
-            $(`global-col`).value = c;
-            $(`global-row`).value = r;
-            applyGlobalDirect();
-            refreshPreview();
-        }
+        window.setPreset = (c, r) => { $(`global-col`).value = c; $(`global-row`).value = r; applyGlobalDirect(); }
+        window.setPreviewPreset = (c, r) => { $(`global-col`).value = c; $(`global-row`).value = r; applyGlobalDirect(); refreshPreview(); }
 
         window.applyGlobalDirect = () => {
             const [c, r] = ['col', 'row'].map(k => parseInt($(`global-${k}`).value) || 1);
@@ -560,36 +526,85 @@
         window.openPreviewConsole = () => { if(state.pages.length) { els.previewModal.classList.remove('hidden'); refreshPreview(); } };
 
         window.refreshPreview = () => {
-            state.outputSettings.sortOrder = $('preview-order-select').value; state.previewPageNum = 1; els.previewContent.innerHTML = '';
-            els.loadingBar.style.width = '100%'; 
-            // 使用汉化后的提示语
-            els.loadingPercent.textContent = t('previewing');
-            els.loading.classList.remove('hidden'); 
-            
-            setTimeout(async () => { try { state.previewPdfDoc = await generateFinalPDF(true); await renderMorePreview(5); } catch(e) { alert(e.message); } finally { hideLoading(); } }, 50);
+            state.outputSettings.sortOrder = $('preview-order-select').value; state.previewPageNum = 1; state.previewCursor = 0; els.previewContent.innerHTML = '';
+            loadPreviewBatch();
+        };
+
+        window.loadPreviewBatch = async () => {
+            if (state.previewLoading) return;
+            if (state.previewCursor >= state.pages.length) return;
+
+            state.previewLoading = true;
+            const btn = els.previewMoreBtn;
+            btn.innerHTML = `<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> ${t('loading')}`;
+            btn.classList.remove('hidden');
+
+            try {
+                const batchSize = 2;
+                const endCursor = Math.min(state.previewCursor + batchSize, state.pages.length);
+                const batchPdfDoc = await PDFLib.PDFDocument.create();
+                const cache = {};
+
+                for (let i = state.previewCursor; i < endCursor; i++) {
+                    const p = state.pages[i];
+                    const d = state.documents.find(doc => doc.id === p.docId);
+                    if (!cache[p.docId]) cache[p.docId] = await PDFLib.PDFDocument.load(await d.file.arrayBuffer());
+                    const { width, height } = cache[p.docId].getPages()[p.pageIndexInDoc - 1].getSize();
+                    const cs = [0, ...p.cols.sort((a,b)=>a-b), 1], rs = [0, ...p.rows.sort((a,b)=>a-b), 1];
+                    const pSlices = [];
+                    for(let r=0; r<rs.length-1; r++) for(let c=0; c<cs.length-1; c++) {
+                        const sDoc = await PDFLib.PDFDocument.create(), [cp] = await sDoc.copyPages(cache[p.docId], [p.pageIndexInDoc-1]);
+                        cp.setCropBox(cs[c]*width, height - rs[r+1]*height, (cs[c+1]-cs[c])*width, (rs[r+1]-rs[r])*height);
+                        sDoc.addPage(cp); pSlices.push(await PDFLib.PDFDocument.load(await sDoc.save()));
+                    }
+                    const sortedSlices = state.outputSettings.sortOrder === 'col' ? 
+                        Array.from({length: cs.length-1}, (_,c)=>Array.from({length: rs.length-1}, (_,r)=>pSlices[r*(cs.length-1)+c])).flat() : pSlices;
+                    for (const s of sortedSlices) { 
+                        const [p] = await batchPdfDoc.copyPages(s, [0]); 
+                        p.setRotation(PDFLib.degrees(state.outputSettings.rotation)); 
+                        batchPdfDoc.addPage(p); 
+                    }
+                }
+
+                const batchBytes = await batchPdfDoc.save();
+                const proxy = await pdfjsLib.getDocument(batchBytes).promise;
+
+                for (let i = 1; i <= proxy.numPages; i++) {
+                    const page = await proxy.getPage(i);
+                    const vp = page.getViewport({ scale: 1 });
+                    const cvs = document.createElement('canvas');
+                    const scale = (els.previewContent.clientWidth * 0.9 / vp.width) * (vp.width*vp.height>3000000?0.5:1);
+                    const svp = page.getViewport({ scale });
+                    cvs.className = "bg-white shadow-lg shrink-0 fade-in";
+                    cvs.width = svp.width; cvs.height = svp.height;
+                    cvs.style.maxWidth = "90%";
+                    await page.render({ canvasContext: cvs.getContext('2d'), viewport: svp }).promise;
+                    els.previewContent.appendChild(cvs);
+                }
+                state.previewCursor = endCursor;
+            } catch(e) { console.error(e); alert("Preview Error: " + e.message); } finally {
+                state.previewLoading = false;
+                if (state.previewCursor >= state.pages.length) btn.classList.add('hidden');
+                else { btn.innerHTML = `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 13l-7 7-7-7" stroke-width="2"></path></svg> <span>${t('loadMore')}</span>`; btn.classList.remove('hidden'); }
+            }
         };
 
         async function generateFinalPDF(isPreview = false) {
             state.processing.cancelled = false;
             const out = await PDFLib.PDFDocument.create(), cache = {}, slices = [];
             const total = state.pages.length;
-            
             for (let i = 0; i < total; i++) {
                 if (state.processing.cancelled) throw new Error(t('cancelled'));
-                
                 const p = state.pages[i];
                 if (!isPreview) {
                     const pct = Math.round((i / total) * 100);
                     showLoading(t('loadingMagic'), pct);
                     if (i % 2 === 0) await new Promise(r => setTimeout(r, 0));
                 }
-
                 const d = state.documents.find(doc => doc.id === p.docId);
                 if (!cache[p.docId]) cache[p.docId] = await PDFLib.PDFDocument.load(await d.file.arrayBuffer());
-                
                 const { width, height } = cache[p.docId].getPages()[p.pageIndexInDoc - 1].getSize();
                 const cs = [0, ...p.cols.sort((a,b)=>a-b), 1], rs = [0, ...p.rows.sort((a,b)=>a-b), 1], pSlices = [];
-                
                 for(let r=0; r<rs.length-1; r++) for(let c=0; c<cs.length-1; c++) {
                     const sDoc = await PDFLib.PDFDocument.create(), [cp] = await sDoc.copyPages(cache[p.docId], [p.pageIndexInDoc-1]);
                     cp.setCropBox(cs[c]*width, height - rs[r+1]*height, (cs[c+1]-cs[c])*width, (rs[r+1]-rs[r])*height);
@@ -597,34 +612,13 @@
                 }
                 slices.push(...(state.outputSettings.sortOrder === 'col' ? Array.from({length: cs.length-1}, (_,c)=>Array.from({length: rs.length-1}, (_,r)=>pSlices[r*(cs.length-1)+c])).flat() : pSlices));
             }
-            
             if (state.processing.cancelled) throw new Error(t('cancelled'));
-            
-            for (const s of slices) { 
-                const [p] = await out.copyPages(s, [0]); 
-                p.setRotation(PDFLib.degrees(state.outputSettings.rotation)); 
-                out.addPage(p); 
-            }
+            for (const s of slices) { const [p] = await out.copyPages(s, [0]); p.setRotation(PDFLib.degrees(state.outputSettings.rotation)); out.addPage(p); }
             return out;
         }
         
-        window.cancelProcess = () => {
-            state.processing.cancelled = true;
-            hideLoading();
-        };
-
-        window.renderMorePreview = async (count=1) => {
-            const pdf = await pdfjsLib.getDocument(await state.previewPdfDoc.save()).promise, end = Math.min(state.previewPageNum + count - 1, pdf.numPages);
-            for (let i = state.previewPageNum; i <= end; i++) {
-                const p = await pdf.getPage(i), vp = p.getViewport({ scale: 1 }), cvs = document.createElement('canvas');
-                const scale = (els.previewContent.clientWidth * 0.9 / vp.width) * (vp.width*vp.height>3000000?0.5:1);
-                const svp = p.getViewport({ scale });
-                cvs.className = "bg-white shadow-lg shrink-0"; cvs.width = svp.width; cvs.height = svp.height;
-                cvs.style.maxWidth = "90%"; await p.render({ canvasContext: cvs.getContext('2d'), viewport: svp }).promise;
-                els.previewContent.appendChild(cvs);
-            }
-            state.previewPageNum = end + 1; els.previewMoreBtn.classList.toggle('hidden', state.previewPageNum > pdf.numPages);
-        };
+        window.cancelProcess = () => { state.processing.cancelled = true; hideLoading(); };
+        window.renderMorePreview = () => {}; 
 
         window.closePreview = () => els.previewModal.classList.add('hidden');
         window.processAndDownload = () => {
@@ -634,11 +628,7 @@
                     const blob = new Blob([await (await generateFinalPDF()).save()], {type:'application/pdf'}), url = URL.createObjectURL(blob);
                     const l = document.createElement('a'); l.href = url; l.download = `LittlePrince_Cut_${Date.now()}.pdf`; l.click();
                     setTimeout(() => URL.revokeObjectURL(url), 100);
-                } catch(e) { 
-                    if(e.message !== t('cancelled')) alert(e.message); 
-                } finally { 
-                    hideLoading(); 
-                }
+                } catch(e) { if(e.message !== t('cancelled')) alert(e.message); } finally { hideLoading(); }
             }, 50);
         };
 
