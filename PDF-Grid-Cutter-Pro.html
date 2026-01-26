@@ -18,12 +18,10 @@
         .line-row { left: 0; right: 0; height: 2px; background: #3b82f6; cursor: row-resize; }
         .line-col::after { content: ''; position: absolute; left: -15px; right: -15px; top: 0; bottom: 0; }
         .line-row::after { content: ''; position: absolute; top: -15px; bottom: -15px; left: 0; right: 0; }
-        
-        /* 激活状态 */
         .line-col.active { box-shadow: 0 0 12px #ef4444; background: #ef4444; z-index: 60; }
         .line-row.active { box-shadow: 0 0 12px #3b82f6; background: #3b82f6; z-index: 60; }
         
-        /* 动画 */
+        /* 动画与过渡 */
         .modal-enter { animation: pop 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
         @keyframes pop { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         
@@ -33,12 +31,13 @@
         
         .stepper-btn:active { transform: scale(0.92); background-color: #f1f5f9; }
         
-        /* 预设按钮与卡片 */
+        /* 预设按钮样式 */
         .preset-btn { transition: all 0.2s; border: 2px solid transparent; }
         .preset-btn:hover { border-color: #e0e7ff; background-color: #f5f3ff; }
         .preset-btn:active { transform: scale(0.95); }
         .preset-icon { border-color: currentColor; }
         
+        /* 预设卡片样式 */
         .preset-card { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); border: 2px solid #e2e8f0; }
         .preset-card:hover { border-color: #818cf8; background-color: #f5f3ff; transform: translateY(-2px); }
         .preset-card.selected { border-color: #4f46e5; background-color: #eef2ff; ring: 2px solid #4f46e5; }
@@ -47,7 +46,7 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         /* 禁用按钮样式 */
-        button:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+        button:disabled { opacity: 0.3; cursor: not-allowed; }
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen flex flex-col pb-24 md:pb-10">
@@ -75,7 +74,6 @@
         <div id="global-toolbar" class="hidden w-full max-w-4xl mb-8 p-4 bg-white/90 backdrop-blur-xl rounded-[1.5rem] shadow-xl shadow-indigo-100/50 border border-white/60 flex flex-col animate-[fadeIn_0.4s] transition-all gap-4">
             <div class="flex flex-col md:flex-row items-center justify-between gap-4">
                 <div class="flex items-center gap-3 w-full md:w-auto">
-                    <!-- 剪刀图标 -->
                     <div class="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl shrink-0"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z"></path></svg></div>
                     <div><span class="text-sm font-bold text-slate-800 block" data-i18n="batchSettings">批量网格</span><span class="text-[10px] text-slate-400 font-medium" data-i18n="batchDesc">一键应用到所有页面</span></div>
                 </div>
@@ -199,7 +197,7 @@
     <input type="file" id="add-file-input" accept="application/pdf,image/*" multiple class="hidden" />
 
     <script>
-        var state = { documents: [], pages: [], nextDocId: 1, drag: { active: false }, outputSettings: { rotation: 0, sortOrder: 'row' }, previewPdfDoc: null, previewPageNum: 1, copySourceIndex: -1, processing: { cancelled: false }, renderTasks: {}, previewCursor: 0, previewLoading: false, renderedCount: 0 };
+        var state = { documents: [], pages: [], nextDocId: 1, drag: { active: false }, outputSettings: { rotation: 0, sortOrder: 'row' }, previewPdfDoc: null, previewPageNum: 1, copySourceIndex: -1, processing: { cancelled: false }, renderTasks: {}, previewCursor: 0, previewLoading: false };
         const $ = id => document.getElementById(id);
         const $$ = n => Array.from({length: n-1}, (_, i) => (i+1)/n);
         const els = { fileInput: $('add-file-input'), uploadArea: $('upload-area'), dropZone: $('drop-zone'), pagesContainer: $('pages-container'), loading: $('loading'), loadingText: $('loading-text'), loadingBar: $('loading-bar'), loadingPercent: $('loading-percent'), modal: $('copy-modal'), previewModal: $('preview-modal'), previewContent: $('preview-content'), previewMoreBtn: $('preview-more-btn'), globalToolbar: $('global-toolbar'), bottomBar: $('bottom-bar') };
@@ -273,8 +271,26 @@
         }
 
         function getSlices(p, width, height) {
-            const cs = [0, ...p.cols.sort((a,b)=>a-b), 1], rs = [0, ...p.rows.sort((a,b)=>a-b), 1], slices = [];
-            for(let r=0; r<rs.length-1; r++) for(let c=0; c<cs.length-1; c++) slices.push({x:cs[c]*width, y:height-rs[r+1]*height, w:(cs[c+1]-cs[c])*width, h:(rs[r+1]-rs[r])*height});
+            // FIX: Force numbers to avoid string concatenation issues
+            const cs = [0, ...p.cols.sort((a,b)=>a-b), 1].map(Number);
+            const rs = [0, ...p.rows.sort((a,b)=>a-b), 1].map(Number);
+            const slices = [];
+            
+            for(let r=0; r<rs.length-1; r++) {
+                for(let c=0; c<cs.length-1; c++) {
+                    const x = cs[c] * width;
+                    const w = (cs[c+1] - cs[c]) * width;
+                    
+                    // FIX: Correctly calculate Y and Height for PDF coordinate system (Bottom-Left origin)
+                    // Visual Top = rs[r], Visual Bottom = rs[r+1]
+                    // PDF Y (from bottom) = Height - Visual Bottom * Height
+                    // Height = (Visual Bottom - Visual Top) * Height
+                    const h = (rs[r+1] - rs[r]) * height;
+                    const y = height - (rs[r+1] * height);
+
+                    slices.push({x, y, w, h});
+                }
+            }
             return {slices, cs, rs};
         }
 
