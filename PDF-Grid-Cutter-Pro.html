@@ -11,21 +11,41 @@
     <style>
         body { font-family: system-ui, -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
         input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+        
+        /* 交互线 */
         .line-col, .line-row { position: absolute; z-index: 50; touch-action: none; will-change: left, top; }
         .line-col { top: 0; bottom: 0; width: 2px; background: #ef4444; cursor: col-resize; }
         .line-row { left: 0; right: 0; height: 2px; background: #3b82f6; cursor: row-resize; }
-        /* 增加触控热区 */
-        .line-col::after { content: ''; position: absolute; left: -10px; right: -10px; top: 0; bottom: 0; }
-        .line-row::after { content: ''; position: absolute; top: -10px; bottom: -10px; left: 0; right: 0; }
+        .line-col::after { content: ''; position: absolute; left: -15px; right: -15px; top: 0; bottom: 0; }
+        .line-row::after { content: ''; position: absolute; top: -15px; bottom: -15px; left: 0; right: 0; }
         .active { box-shadow: 0 0 12px #ef4444; background: #ef4444; z-index: 60; }
-        .line-col.active { width: 4px; }
-        .line-row.active { height: 4px; }
-        .loading-overlay { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(8px); }
-        .modal-enter { animation: pop 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+        
+        /* 动画与过渡 */
+        .modal-enter { animation: pop 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
         @keyframes pop { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        
         .mobile-settings-panel { transition: all 0.3s ease-in-out; overflow: hidden; max-height: 80vh; opacity: 1; }
         .mobile-settings-panel.closed { max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; }
         @media (min-width: 768px) { .mobile-settings-panel { display: block !important; max-height: none !important; opacity: 1 !important; } }
+        
+        .stepper-btn:active { transform: scale(0.92); background-color: #f1f5f9; }
+        
+        /* 预设按钮样式 */
+        .preset-btn { transition: all 0.2s; border: 2px solid transparent; }
+        .preset-btn:hover { border-color: #e0e7ff; background-color: #f5f3ff; }
+        .preset-btn:active { transform: scale(0.95); }
+        .preset-icon { border-color: currentColor; }
+        
+        /* 预设卡片样式 */
+        .preset-card { 
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); 
+            border: 2px solid #e2e8f0; 
+        }
+        .preset-card:hover { border-color: #818cf8; background-color: #f5f3ff; transform: translateY(-2px); }
+        .preset-card.selected { border-color: #4f46e5; background-color: #eef2ff; ring: 2px solid #4f46e5; }
+        
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen flex flex-col pb-24 md:pb-10">
@@ -56,15 +76,68 @@
     </header>
 
     <main class="flex-grow container mx-auto px-4 pt-6 flex flex-col items-center">
-        <div id="global-toolbar" class="hidden w-full max-w-5xl mb-6 p-1 pr-2 bg-white rounded-2xl shadow-sm border border-slate-100 flex-wrap justify-between items-center gap-2 animate-[fadeIn_0.3s]">
-            <div class="flex items-center gap-2 px-3 py-2 bg-indigo-50 rounded-xl">
-                <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                <span class="text-sm text-indigo-900 font-bold" data-i18n="batchSettings">批量设置</span>
+        <!-- 升级后的全局工具栏 -->
+        <div id="global-toolbar" class="hidden w-full max-w-4xl mb-8 p-4 bg-white/90 backdrop-blur-xl rounded-[1.5rem] shadow-xl shadow-indigo-100/50 border border-white/60 flex flex-col animate-[fadeIn_0.4s] transition-all gap-4">
+            
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                 <!-- 标题区 -->
+                <div class="flex items-center gap-3 w-full md:w-auto">
+                    <div class="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl shrink-0">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                    </div>
+                    <div>
+                        <span class="text-sm font-bold text-slate-800 block" data-i18n="batchSettings">批量网格</span>
+                        <span class="text-[10px] text-slate-400 font-medium" data-i18n="batchDesc">一键应用到所有页面</span>
+                    </div>
+                </div>
+
+                <!-- 快捷预设按钮组 (新增 3x1) -->
+                <div class="flex gap-2">
+                    <button onclick="setPreset(1,2)" class="preset-btn p-2 rounded-lg bg-white border border-slate-200 text-slate-600" title="1列2行">
+                        <div class="w-4 h-5 border border-current rounded flex flex-col"><div class="flex-1 border-b border-current"></div><div class="flex-1"></div></div>
+                    </button>
+                    <button onclick="setPreset(2,1)" class="preset-btn p-2 rounded-lg bg-white border border-slate-200 text-slate-600" title="2列1行">
+                        <div class="w-5 h-4 border border-current rounded flex"><div class="flex-1 border-r border-current"></div><div class="flex-1"></div></div>
+                    </button>
+                    <button onclick="setPreset(3,1)" class="preset-btn p-2 rounded-lg bg-white border border-slate-200 text-slate-600" title="3列1行">
+                        <div class="w-5 h-4 border border-current rounded grid grid-cols-3"><div class="border-r border-current"></div><div class="border-r border-current"></div><div></div></div>
+                    </button>
+                    <button onclick="setPreset(2,2)" class="preset-btn p-2 rounded-lg bg-white border border-slate-200 text-slate-600" title="2列2行">
+                        <div class="w-5 h-5 border border-current rounded grid grid-cols-2 grid-rows-2"><div class="border-r border-b border-current"></div><div class="border-b border-current"></div><div class="border-r border-current"></div><div></div></div>
+                    </button>
+                    <button onclick="setPreset(3,3)" class="preset-btn p-2 rounded-lg bg-white border border-slate-200 text-slate-600" title="3列3行">
+                        <div class="w-5 h-5 border border-current rounded grid grid-cols-3 grid-rows-3 text-[4px] leading-none text-center"><div class="col-span-3 row-span-3 flex items-center justify-center">3x3</div></div>
+                    </button>
+                </div>
             </div>
-            <div class="flex items-center gap-2 flex-grow justify-end">
-                <div class="flex items-center border border-slate-200 rounded-lg bg-white px-2 py-1"><span class="text-[10px] text-red-500 font-bold uppercase mr-1" data-i18n="cols">列数</span><input type="number" id="global-col" value="1" min="1" class="w-8 text-center text-sm font-bold outline-none"></div>
-                <div class="flex items-center border border-slate-200 rounded-lg bg-white px-2 py-1"><span class="text-[10px] text-blue-500 font-bold uppercase mr-1" data-i18n="rows">行数</span><input type="number" id="global-row" value="1" min="1" class="w-8 text-center text-sm font-bold outline-none"></div>
-                <button onclick="applyGlobalDirect()" class="bg-slate-800 text-white px-4 py-1.5 rounded-lg text-xs" data-i18n="applyAll">应用到全部</button>
+            
+            <div class="h-px bg-slate-100 w-full"></div>
+
+            <!-- 手动控制区 (布局优化：电脑端强制不换行) -->
+            <div class="flex flex-col md:flex-row md:flex-nowrap items-center gap-3 w-full">
+                <div class="flex-grow grid grid-cols-2 gap-3 w-full md:w-auto">
+                    <div class="bg-white border border-slate-100 rounded-2xl p-1.5 flex items-center justify-between shadow-sm">
+                        <div class="flex items-center ml-2 mr-1 gap-1"><span class="w-1.5 h-1.5 rounded-full bg-red-400"></span><span class="text-[10px] font-bold text-slate-500 uppercase" data-i18n="cols">列</span></div>
+                        <div class="flex items-center gap-1">
+                            <button onclick="stepGlobal('col', -1)" class="stepper-btn w-9 h-9 flex items-center justify-center rounded-xl bg-slate-50 text-slate-600 font-bold hover:bg-slate-100">-</button>
+                            <input type="number" id="global-col" value="1" min="1" class="w-10 text-center font-bold text-slate-800 outline-none bg-transparent" onchange="applyGlobalDirect()">
+                            <button onclick="stepGlobal('col', 1)" class="stepper-btn w-9 h-9 flex items-center justify-center rounded-xl bg-red-50 text-red-500 font-bold hover:bg-red-100">+</button>
+                        </div>
+                    </div>
+                    <div class="bg-white border border-slate-100 rounded-2xl p-1.5 flex items-center justify-between shadow-sm">
+                        <div class="flex items-center ml-2 mr-1 gap-1"><span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span><span class="text-[10px] font-bold text-slate-500 uppercase" data-i18n="rows">行</span></div>
+                        <div class="flex items-center gap-1">
+                            <button onclick="stepGlobal('row', -1)" class="stepper-btn w-9 h-9 flex items-center justify-center rounded-xl bg-slate-50 text-slate-600 font-bold hover:bg-slate-100">-</button>
+                            <input type="number" id="global-row" value="1" min="1" class="w-10 text-center font-bold text-slate-800 outline-none bg-transparent" onchange="applyGlobalDirect()">
+                            <button onclick="stepGlobal('row', 1)" class="stepper-btn w-9 h-9 flex items-center justify-center rounded-xl bg-blue-50 text-blue-500 font-bold hover:bg-blue-100">+</button>
+                        </div>
+                    </div>
+                </div>
+                <!-- 优化：缩小按钮尺寸，使用 flex-shrink-0 防止压缩，h-auto 适配高度 -->
+                <button onclick="applyGlobalDirect()" class="w-full md:w-auto md:shrink-0 px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-2xl font-bold text-xs shadow-lg shadow-slate-200 transition-all active:scale-95 flex items-center justify-center gap-2 h-[52px]" data-i18n="applyAll">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    <span>应用设置</span>
+                </button>
             </div>
         </div>
 
@@ -75,17 +148,24 @@
                 <p class="text-sm text-slate-400 mt-2" data-i18n="slogan">小王子为你施展分割魔法</p>
                 <div class="absolute inset-0 z-10"></div>
             </div>
-            <div class="mt-8 space-y-3 px-2">
-                <a id="pdfcraft-link" href="https://pdfcraft.devtoolcafe.com/zh/" target="_blank" class="flex items-center justify-between p-4 bg-white rounded-2xl shadow-sm border border-slate-100 hover:border-indigo-200 transition-all">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-500 shrink-0"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" stroke-width="2"></path></svg></div>
-                        <div class="text-left"><div class="text-sm font-bold text-slate-700">PDFCraft</div><div class="text-xs text-slate-400" data-i18n="pdfcraftDesc">极致轻便的 PDF 在线处理工具箱</div></div>
+            
+            <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4 w-full px-2">
+                <a id="pdfcraft-link" href="https://pdfcraft.devtoolcafe.com/zh/" target="_blank" class="flex items-center gap-3 p-4 bg-white rounded-2xl shadow-sm border border-slate-100 hover:border-indigo-200 transition-all">
+                    <div class="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-500 shrink-0">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" stroke-width="2"></path></svg>
+                    </div>
+                    <div class="text-left">
+                        <div class="text-sm font-bold text-slate-700">PDFCraft</div>
+                        <div class="text-xs text-slate-400" data-i18n="pdfcraftDesc">极致轻便的 PDF 在线处理工具箱</div>
                     </div>
                 </a>
-                <a href="https://tools.pdf24.org/zh/" target="_blank" class="flex items-center justify-between p-4 bg-white rounded-2xl shadow-sm border border-slate-100 hover:border-blue-200 transition-all">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-500 shrink-0"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" stroke-width="2"></path></svg></div>
-                        <div class="text-left"><div class="text-sm font-bold text-slate-700">PDF24</div><div class="text-xs text-slate-400" data-i18n="pdf24Desc">免费且功能强大的离线级工具</div></div>
+                <a href="https://tools.pdf24.org/zh/" target="_blank" class="flex items-center gap-3 p-4 bg-white rounded-2xl shadow-sm border border-slate-100 hover:border-blue-200 transition-all">
+                    <div class="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-500 shrink-0">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" stroke-width="2"></path></svg>
+                    </div>
+                    <div class="text-left">
+                        <div class="text-sm font-bold text-slate-700">PDF24 Tools</div>
+                        <div class="text-xs text-slate-400" data-i18n="pdf24Desc">免费且功能强大的离线级工具</div>
                     </div>
                 </a>
             </div>
@@ -93,6 +173,7 @@
         <div id="pages-container" class="w-full max-w-5xl flex flex-col gap-5 hidden pb-20"></div>
     </main>
 
+    <!-- 底部悬浮条 (Mobile) -->
     <div id="bottom-bar" class="hidden fixed bottom-6 left-4 right-4 z-[90] flex justify-end items-center gap-2 md:hidden">
         <div class="bg-white/90 backdrop-blur-md border border-slate-200 rounded-2xl shadow-2xl p-2 flex gap-2">
             <button onclick="resetAll()" class="w-8 h-8 text-red-400 bg-red-50 rounded-lg flex items-center justify-center"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-width="2"></path></svg></button>
@@ -103,6 +184,7 @@
         </div>
     </div>
 
+    <!-- 预览 Modal (大图标修复: 2列2行田字格) -->
     <div id="preview-modal" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/90 p-4">
         <div class="bg-white w-full max-w-6xl h-[90vh] rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden modal-enter relative">
             <div class="w-full md:w-80 bg-slate-50 border-r border-slate-200 flex flex-col shrink-0">
@@ -114,6 +196,19 @@
                     </div>
                 </div>
                 <div id="settings-container" class="mobile-settings-panel flex-grow p-4 space-y-3 closed">
+                    
+                    <!-- 预设选择区 (这里也同步更新图标) -->
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="w-full px-4 py-3 flex items-center gap-2 border-b border-slate-100 bg-slate-50/50"><svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg><span class="text-sm font-bold text-slate-700" data-i18n="applySettings">快速预设</span></div>
+                        <div class="p-4 grid grid-cols-4 gap-2">
+                            <button onclick="setPreviewPreset(1,2)" class="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 flex justify-center"><div class="w-4 h-6 border border-current rounded flex flex-col"><div class="flex-1 border-b border-current"></div><div class="flex-1"></div></div></button>
+                            <button onclick="setPreviewPreset(2,1)" class="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 flex justify-center"><div class="w-6 h-4 border border-current rounded flex"><div class="flex-1 border-r border-current"></div><div class="flex-1"></div></div></button>
+                            <!-- 2x2 图标修复: 使用 grid 代替 flex 布局 -->
+                            <button onclick="setPreviewPreset(2,2)" class="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 flex justify-center"><div class="w-6 h-6 border border-current rounded grid grid-cols-2 grid-rows-2"><div class="border-r border-b border-current"></div><div class="border-b border-current"></div><div class="border-r border-current"></div><div></div></div></button>
+                            <button onclick="setPreviewPreset(3,3)" class="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 flex justify-center"><div class="w-6 h-6 border border-current rounded grid grid-cols-3 grid-rows-3 text-[5px] flex items-center justify-center font-bold">3x3</div></button>
+                        </div>
+                    </div>
+
                     <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                         <div class="w-full px-4 py-3 flex items-center gap-2 border-b border-slate-100 bg-slate-50/50"><svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" stroke-width="2"></path></svg><span class="text-sm font-bold text-slate-700" data-i18n="sliceOrder">切片排序</span></div>
                         <div class="p-4"><select id="preview-order-select" class="w-full border rounded-lg px-3 py-2 text-sm font-bold"><option value="row" data-i18n="orderRow">行优先 (Z字形)</option><option value="col" data-i18n="orderCol">列优先 (N字形)</option></select></div>
@@ -142,7 +237,8 @@
         </div>
     </div>
 
-    <div id="copy-modal" class="hidden fixed inset-0 z-[150] flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+    <!-- 复制设置 Modal -->
+     <div id="copy-modal" class="hidden fixed inset-0 z-[150] flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm">
         <div class="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-6 modal-enter">
             <div class="flex justify-between items-center mb-6"><h3 class="text-lg font-bold" data-i18n="applySettings">应用分割参数</h3><button onclick="closeCopyModal()" class="p-2 bg-slate-100 rounded-full">✕</button></div>
             <div class="space-y-3 mb-8">
@@ -154,25 +250,69 @@
         </div>
     </div>
 
+    <!-- 升级后的 Loading：带进度条与取消 -->
     <div id="loading" class="hidden fixed inset-0 z-[300] flex items-center justify-center loading-overlay">
-        <div class="bg-white/90 px-8 py-6 rounded-2xl shadow-xl flex flex-col items-center">
-            <div class="w-12 h-12 mb-4 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-            <p id="loading-text" class="text-slate-700 font-bold" data-i18n="loadingMagic">正在施展分割魔法...</p>
+        <div class="bg-white/95 px-8 py-8 rounded-3xl shadow-2xl flex flex-col items-center w-80 border border-slate-100">
+            <!-- Spinner -->
+            <div class="relative w-16 h-16 mb-6">
+                <div class="absolute inset-0 border-4 border-indigo-100 rounded-full"></div>
+                <div class="absolute inset-0 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+            
+            <p id="loading-text" class="text-slate-800 font-bold text-lg mb-4 text-center" data-i18n="loadingMagic">正在施展分割魔法...</p>
+            
+            <!-- Progress Bar -->
+            <div class="w-full bg-slate-100 rounded-full h-2 mb-2 overflow-hidden">
+                <div id="loading-bar" class="bg-indigo-600 h-2 rounded-full transition-all duration-300 w-0"></div>
+            </div>
+            <p id="loading-percent" class="text-xs text-slate-400 font-mono mb-6">0%</p>
+
+            <!-- Cancel Button -->
+            <button onclick="cancelProcess()" class="px-6 py-2 rounded-xl text-xs font-bold text-red-500 bg-red-50 hover:bg-red-100 transition-colors">
+                <span data-i18n="cancel">停止操作</span>
+            </button>
         </div>
     </div>
 
     <input type="file" id="add-file-input" accept="application/pdf,image/*" multiple class="hidden" />
 
     <script>
-        var state = { documents: [], pages: [], nextDocId: 1, drag: { active: false }, outputSettings: { rotation: 0, sortOrder: 'row' }, previewPdfDoc: null, previewPageNum: 1, copySourceIndex: -1 };
+        var state = { 
+            documents: [], 
+            pages: [], 
+            nextDocId: 1, 
+            drag: { active: false }, 
+            outputSettings: { rotation: 0, sortOrder: 'row' }, 
+            previewPdfDoc: null, 
+            previewPageNum: 1, 
+            copySourceIndex: -1,
+            processing: { cancelled: false } 
+        };
+        
         function $(id) { return document.getElementById(id); }
         function $$(n) { return Array.from({length: n-1}, (_, i) => (i+1)/n); }
-        var els = { fileInput: $('add-file-input'), uploadArea: $('upload-area'), dropZone: $('drop-zone'), pagesContainer: $('pages-container'), loading: $('loading'), loadingText: $('loading-text'), modal: $('copy-modal'), previewModal: $('preview-modal'), previewContent: $('preview-content'), previewMoreBtn: $('preview-more-btn'), globalToolbar: $('global-toolbar'), bottomBar: $('bottom-bar') };
+        
+        var els = { 
+            fileInput: $('add-file-input'), 
+            uploadArea: $('upload-area'), 
+            dropZone: $('drop-zone'), 
+            pagesContainer: $('pages-container'), 
+            loading: $('loading'), 
+            loadingText: $('loading-text'),
+            loadingBar: $('loading-bar'),
+            loadingPercent: $('loading-percent'),
+            modal: $('copy-modal'), 
+            previewModal: $('preview-modal'), 
+            previewContent: $('preview-content'), 
+            previewMoreBtn: $('preview-more-btn'), 
+            globalToolbar: $('global-toolbar'), 
+            bottomBar: $('bottom-bar') 
+        };
         
         var currentLang = 'zh';
         var i18n = {
-            zh: { appTitle: "PDF 超级分割工具", appSubtitle: "小王子", addFile: "添加", download: "下载", preview: "预演", batchSettings: "批量分割", cols: "列数", rows: "行数", applyAll: "应用到全部", clickUpload: "点击添加 PDF 或图片", slogan: "小王子为你施展分割魔法", pdfcraftDesc: "极致轻便的 PDF 在线处理工具箱", pdf24Desc: "免费且功能强大的离线级工具", applySettings: "应用分割参数", allPages: "所有页面", currentFile: "仅当前文件", pageRange: "页码范围", confirmApply: "确认应用", loadingMagic: "正在施展魔法...", parsing: "正在解析...", copy: "复制", loading: "加载中...", alertParseError: "失败: ", alertClear: "确定清空吗？", previewConsole: "高级输出控制台", consoleDesc: "调整后刷新", close: "继续编辑", loadMore: "加载更多", sliceRotation: "切片旋转", sliceOrder: "切片排序", orderRow: "行优先 (Z字)", orderCol: "列优先 (N字)", refreshPreview: "刷新预览", downloadPDF: "下载 PDF", settingsToggle: "设置" },
-            en: { appTitle: "PDF Grid Cutter", appSubtitle: "Little Prince", addFile: "Add", download: "DL", preview: "Preview", batchSettings: "Batch", cols: "Cols", rows: "Rows", applyAll: "Apply All", clickUpload: "Click/Drag PDF or Images", slogan: "Little Prince casts splitting magic", pdfcraftDesc: "Lightweight PDF online toolbox", pdf24Desc: "Powerful Offline Tools", applySettings: "Apply Settings", allPages: "All Pages", currentFile: "Current File", pageRange: "Range", confirmApply: "Apply", loadingMagic: "Casting magic...", parsing: "Parsing...", copy: "Copy", loading: "Loading...", alertParseError: "Error: ", alertClear: "Clear all?", previewConsole: "Console", consoleDesc: "Refresh to apply", close: "Edit", loadMore: "Load More", sliceRotation: "Rotation", sliceOrder: "Order", orderRow: "Row Major", orderCol: "Col Major", refreshPreview: "Refresh", downloadPDF: "Download PDF", settingsToggle: "Settings" }
+            zh: { appTitle: "PDF 超级分割工具", appSubtitle: "小王子", addFile: "添加", download: "下载", preview: "预演", batchSettings: "批量分割", batchDesc: "一键应用设置", cols: "列数", rows: "行数", applyAll: "应用设置", clickUpload: "点击添加 PDF 或图片", slogan: "小王子为你施展分割魔法", pdfcraftDesc: "极致轻便的 PDF 在线处理工具箱", pdf24Desc: "免费且功能强大的离线级工具", applySettings: "应用分割参数", allPages: "所有页面", currentFile: "仅当前文件", pageRange: "页码范围", confirmApply: "确认应用", loadingMagic: "正在施展魔法...", parsing: "正在解析...", copy: "复制", loading: "加载中...", alertParseError: "失败: ", alertClear: "确定清空吗？", previewConsole: "高级输出控制台", consoleDesc: "调整后刷新", close: "继续编辑", loadMore: "加载更多", sliceRotation: "切片旋转", sliceOrder: "切片排序", orderRow: "行优先 (Z字)", orderCol: "列优先 (N字)", refreshPreview: "刷新预览", downloadPDF: "下载 PDF", settingsToggle: "设置", cancel: "停止操作", cancelled: "操作已取消" },
+            en: { appTitle: "PDF Grid Cutter", appSubtitle: "Little Prince", addFile: "Add", download: "DL", preview: "Preview", batchSettings: "Batch", batchDesc: "Apply to all pages", cols: "Cols", rows: "Rows", applyAll: "Apply All", clickUpload: "Click/Drag PDF or Images", slogan: "Little Prince casts splitting magic", pdfcraftDesc: "Lightweight PDF online toolbox", pdf24Desc: "Powerful Offline Tools", applySettings: "Apply Settings", allPages: "All Pages", currentFile: "Current File", pageRange: "Range", confirmApply: "Apply", loadingMagic: "Casting magic...", parsing: "Parsing...", copy: "Copy", loading: "Loading...", alertParseError: "Error: ", alertClear: "Clear all?", previewConsole: "Console", consoleDesc: "Refresh to apply", close: "Edit", loadMore: "Load More", sliceRotation: "Rotation", sliceOrder: "Order", orderRow: "Row Major", orderCol: "Col Major", refreshPreview: "Refresh", downloadPDF: "Download PDF", settingsToggle: "Settings", cancel: "Cancel", cancelled: "Operation Cancelled" }
         };
 
         function t(k) { return i18n[currentLang][k] || k; }
@@ -183,6 +323,15 @@
             if($('pdfcraft-link')) $('pdfcraft-link').href = `https://pdfcraft.devtoolcafe.com/${currentLang === 'zh' ? 'zh/' : ''}`;
         }
 
+        // 辅助函数：格式化文件大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
         els.dropZone.onclick = () => els.fileInput.click();
         els.fileInput.onchange = e => handleFiles(e.target.files);
         els.dropZone.ondrop = e => { e.preventDefault(); handleFiles(e.dataTransfer.files); };
@@ -190,7 +339,7 @@
 
         async function handleFiles(files) {
             if (!files.length) return;
-            showLoading(t('parsing'));
+            showLoading(t('parsing'), 0);
             [els.uploadArea, els.pagesContainer, els.globalToolbar, els.bottomBar].forEach(el => el.classList.toggle('hidden', el === els.uploadArea));
             try {
                 for (const file of files) {
@@ -201,8 +350,11 @@
                         storage = new Blob([bytes], {type:'application/pdf'}); storage.name = file.name;
                         doc = await pdfjsLib.getDocument(bytes).promise;
                     } else continue;
+                    
                     const docId = state.nextDocId++;
-                    state.documents.push({ id: docId, file: storage, pdfDoc: doc, fileName: file.name });
+                    const formattedSize = formatFileSize(storage.size);
+                    state.documents.push({ id: docId, file: storage, pdfDoc: doc, fileName: file.name, fileSize: formattedSize });
+                    
                     for (let i = 1; i <= doc.numPages; i++) {
                         state.pages.push({ docId, pageIndexInDoc: i, cols: [], rows: [], rendered: false });
                         createPageCard(state.pages.length - 1);
@@ -227,7 +379,13 @@
             const p = state.pages[idx], d = state.documents.find(doc => doc.id === p.docId), card = document.createElement('div');
             card.className = "bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden";
             card.innerHTML = `<div class="bg-slate-50/80 border-b p-3 flex justify-between items-center">
-                    <div class="flex items-center gap-2 truncate"><span class="w-6 h-6 bg-white rounded-full flex items-center justify-center text-xs font-bold">${idx+1}</span><span class="text-xs text-slate-400 truncate">${d.fileName}</span></div>
+                    <div class="flex flex-col md:flex-row md:items-center gap-1 md:gap-3 truncate">
+                        <div class="flex items-center gap-2">
+                            <span class="w-6 h-6 bg-white rounded-full flex items-center justify-center text-xs font-bold">${idx+1}</span>
+                            <span class="text-xs text-slate-500 font-bold truncate max-w-[120px]">${d.fileName}</span>
+                        </div>
+                        <span class="text-[10px] text-slate-400 font-mono bg-slate-100 px-1.5 py-0.5 rounded hidden md:inline-block">${d.fileSize}</span>
+                    </div>
                     <div class="flex items-center gap-2">
                         <div class="flex items-center bg-white rounded border p-0.5"><input type="number" id="in-col-${idx}" value="1" min="1" class="w-5 text-center text-xs" onchange="updatePageSplit(${idx})"><span class="text-slate-300 text-[10px]">x</span><input type="number" id="in-row-${idx}" value="1" min="1" class="w-5 text-center text-xs" onchange="updatePageSplit(${idx})"></div>
                         <button onclick="openCopyModal(${idx})" class="p-1.5 text-indigo-500 text-xs font-bold" data-i18n="copy">${t('copy')}</button>
@@ -240,15 +398,12 @@
             const p = state.pages[idx], doc = state.documents.find(d => d.id === p.docId), page = await doc.pdfDoc.getPage(p.pageIndexInDoc);
             const cvs = $(`canvas-${idx}`);
             const viewportRaw = page.getViewport({ scale: 1 });
-            // 优化核心：大图降采样，普通图保持清晰
             const isHighRes = (viewportRaw.width * viewportRaw.height) > 3000000;
             const visualWidth = Math.min(window.innerWidth - 32, 800);
             const svp = page.getViewport({ scale: (visualWidth / viewportRaw.width) * (isHighRes ? 0.6 : 1.2) }); 
-            
             cvs.width = svp.width; cvs.height = svp.height;
             cvs.style.width = "100%"; cvs.style.height = "auto";
             cvs.parentElement.style.width = `${visualWidth}px`; cvs.parentElement.style.maxWidth = '100%';
-
             await page.render({ canvasContext: cvs.getContext('2d'), viewport: svp }).promise;
             $(`ph-${idx}`).remove(); p.rendered = true; renderLines(idx);
         }
@@ -277,6 +432,28 @@
             const [c, r] = ['col', 'row'].map(k => parseInt($(`in-${k}-${idx}`).value) || 1);
             state.pages[idx].cols = $$(c); state.pages[idx].rows = $$(r); renderLines(idx);
         };
+        
+        window.stepGlobal = (type, delta) => {
+            const el = $(`global-${type}`);
+            let val = parseInt(el.value) || 1;
+            val = Math.max(1, val + delta);
+            el.value = val;
+        };
+
+        // 新增：快捷预设应用
+        window.setPreset = (c, r) => {
+            $(`global-col`).value = c;
+            $(`global-row`).value = r;
+            applyGlobalDirect();
+        }
+        
+        // 预览控制台中的预设
+        window.setPreviewPreset = (c, r) => {
+            $(`global-col`).value = c;
+            $(`global-row`).value = r;
+            applyGlobalDirect();
+            refreshPreview();
+        }
 
         window.applyGlobalDirect = () => {
             const [c, r] = ['col', 'row'].map(k => parseInt($(`global-${k}`).value) || 1);
@@ -302,33 +479,60 @@
 
         window.refreshPreview = () => {
             state.outputSettings.sortOrder = $('preview-order-select').value; state.previewPageNum = 1; els.previewContent.innerHTML = '';
-            showLoading(t('loadingMagic')); setTimeout(async () => { try { state.previewPdfDoc = await generateFinalPDF(); await renderMorePreview(5); } catch(e) { alert(e.message); } finally { hideLoading(); } }, 50);
+            els.loadingBar.style.width = '100%'; els.loadingPercent.textContent = 'Previewing...';
+            els.loading.classList.remove('hidden'); 
+            
+            setTimeout(async () => { try { state.previewPdfDoc = await generateFinalPDF(true); await renderMorePreview(5); } catch(e) { alert(e.message); } finally { hideLoading(); } }, 50);
         };
 
-        async function generateFinalPDF() {
+        async function generateFinalPDF(isPreview = false) {
+            state.processing.cancelled = false;
             const out = await PDFLib.PDFDocument.create(), cache = {}, slices = [];
-            for (const p of state.pages) {
+            const total = state.pages.length;
+            
+            for (let i = 0; i < total; i++) {
+                if (state.processing.cancelled) throw new Error(t('cancelled'));
+                
+                const p = state.pages[i];
+                if (!isPreview) {
+                    const pct = Math.round((i / total) * 100);
+                    showLoading(t('loadingMagic'), pct);
+                    if (i % 2 === 0) await new Promise(r => setTimeout(r, 0));
+                }
+
                 const d = state.documents.find(doc => doc.id === p.docId);
                 if (!cache[p.docId]) cache[p.docId] = await PDFLib.PDFDocument.load(await d.file.arrayBuffer());
+                
                 const { width, height } = cache[p.docId].getPages()[p.pageIndexInDoc - 1].getSize();
                 const cs = [0, ...p.cols.sort((a,b)=>a-b), 1], rs = [0, ...p.rows.sort((a,b)=>a-b), 1], pSlices = [];
+                
                 for(let r=0; r<rs.length-1; r++) for(let c=0; c<cs.length-1; c++) {
                     const sDoc = await PDFLib.PDFDocument.create(), [cp] = await sDoc.copyPages(cache[p.docId], [p.pageIndexInDoc-1]);
-                    // 核心修复：PDF坐标原点在左下角，需翻转Y轴计算
                     cp.setCropBox(cs[c]*width, height - rs[r+1]*height, (cs[c+1]-cs[c])*width, (rs[r+1]-rs[r])*height);
                     sDoc.addPage(cp); pSlices.push(await PDFLib.PDFDocument.load(await sDoc.save()));
                 }
                 slices.push(...(state.outputSettings.sortOrder === 'col' ? Array.from({length: cs.length-1}, (_,c)=>Array.from({length: rs.length-1}, (_,r)=>pSlices[r*(cs.length-1)+c])).flat() : pSlices));
             }
-            for (const s of slices) { const [p] = await out.copyPages(s, [0]); p.setRotation(PDFLib.degrees(state.outputSettings.rotation)); out.addPage(p); }
+            
+            if (state.processing.cancelled) throw new Error(t('cancelled'));
+            
+            for (const s of slices) { 
+                const [p] = await out.copyPages(s, [0]); 
+                p.setRotation(PDFLib.degrees(state.outputSettings.rotation)); 
+                out.addPage(p); 
+            }
             return out;
         }
+        
+        window.cancelProcess = () => {
+            state.processing.cancelled = true;
+            hideLoading();
+        };
 
         window.renderMorePreview = async (count=1) => {
             const pdf = await pdfjsLib.getDocument(await state.previewPdfDoc.save()).promise, end = Math.min(state.previewPageNum + count - 1, pdf.numPages);
             for (let i = state.previewPageNum; i <= end; i++) {
                 const p = await pdf.getPage(i), vp = p.getViewport({ scale: 1 }), cvs = document.createElement('canvas');
-                // 预览图也进行智能压缩
                 const scale = (els.previewContent.clientWidth * 0.9 / vp.width) * (vp.width*vp.height>3000000?0.5:1);
                 const svp = p.getViewport({ scale });
                 cvs.className = "bg-white shadow-lg shrink-0"; cvs.width = svp.width; cvs.height = svp.height;
@@ -340,22 +544,30 @@
 
         window.closePreview = () => els.previewModal.classList.add('hidden');
         window.processAndDownload = () => {
-            showLoading(t('loadingMagic')); setTimeout(async () => {
+            showLoading(t('loadingMagic'), 0); 
+            setTimeout(async () => {
                 try {
                     const blob = new Blob([await (await generateFinalPDF()).save()], {type:'application/pdf'}), url = URL.createObjectURL(blob);
                     const l = document.createElement('a'); l.href = url; l.download = `LittlePrince_Cut_${Date.now()}.pdf`; l.click();
-                    setTimeout(() => URL.revokeObjectURL(url), 100); // 内存回收
-                } catch(e) { alert(e.message); } finally { hideLoading(); }
+                    setTimeout(() => URL.revokeObjectURL(url), 100);
+                } catch(e) { 
+                    if(e.message !== t('cancelled')) alert(e.message); 
+                } finally { 
+                    hideLoading(); 
+                }
             }, 50);
         };
 
-        window.resetAll = () => { if(confirm(t('alertClear'))) {
-            Object.assign(state, { documents: [], pages: [], nextDocId: 1, drag: { active: false }, previewPdfDoc: null, previewPageNum: 1 });
-            els.pagesContainer.innerHTML = ''; els.fileInput.value = ''; $('global-col').value = $('global-row').value = 1;
-            ['uploadArea', 'pagesContainer', 'globalToolbar', 'bottomBar', 'previewModal', 'modal', 'loading'].forEach(k => els[k].classList[k==='uploadArea'?'remove':'add']('hidden'));
-        }};
+        window.resetAll = () => { if(confirm(t('alertClear'))) { location.reload(); }};
 
-        function showLoading(txt) { els.loadingText.textContent = txt; els.loading.classList.remove('hidden'); }
+        function showLoading(txt, pct) { 
+            els.loadingText.textContent = txt; 
+            if (typeof pct === 'number') {
+                els.loadingBar.style.width = `${pct}%`;
+                els.loadingPercent.textContent = `${pct}%`;
+            }
+            els.loading.classList.remove('hidden'); 
+        }
         function hideLoading() { els.loading.classList.add('hidden'); }
         updateUI();
     </script>
