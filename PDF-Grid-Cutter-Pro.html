@@ -124,7 +124,7 @@
             <!-- 手动控制区 (布局优化：电脑端强制不换行，按钮高度修复) -->
             <div class="flex flex-col md:flex-row md:flex-nowrap items-center gap-3 w-full">
                 <div class="flex-grow grid grid-cols-2 gap-3 w-full md:w-auto">
-                    <div class="bg-white border border-slate-100 rounded-2xl p-1.5 flex items-center justify-between shadow-sm">
+                    <div class="bg-white border border-slate-100 rounded-2xl p-1.5 flex items-center justify-between shadow-sm h-[50px] box-border">
                         <div class="flex items-center ml-2 mr-1 gap-1"><span class="w-1.5 h-1.5 rounded-full bg-red-400"></span><span class="text-[10px] font-bold text-slate-500 uppercase" data-i18n="cols">列</span></div>
                         <div class="flex items-center gap-1">
                             <button onclick="stepGlobal('col', -1)" class="stepper-btn w-9 h-9 flex items-center justify-center rounded-xl bg-slate-50 text-slate-600 font-bold hover:bg-slate-100">-</button>
@@ -132,7 +132,7 @@
                             <button onclick="stepGlobal('col', 1)" class="stepper-btn w-9 h-9 flex items-center justify-center rounded-xl bg-red-50 text-red-500 font-bold hover:bg-red-100">+</button>
                         </div>
                     </div>
-                    <div class="bg-white border border-slate-100 rounded-2xl p-1.5 flex items-center justify-between shadow-sm">
+                    <div class="bg-white border border-slate-100 rounded-2xl p-1.5 flex items-center justify-between shadow-sm h-[50px] box-border">
                         <div class="flex items-center ml-2 mr-1 gap-1"><span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span><span class="text-[10px] font-bold text-slate-500 uppercase" data-i18n="rows">行</span></div>
                         <div class="flex items-center gap-1">
                             <button onclick="stepGlobal('row', -1)" class="stepper-btn w-9 h-9 flex items-center justify-center rounded-xl bg-slate-50 text-slate-600 font-bold hover:bg-slate-100">-</button>
@@ -141,8 +141,8 @@
                         </div>
                     </div>
                 </div>
-                <!-- 优化：高度调整为 h-[50px] 以严格匹配输入框容器高度 (36+12+2=50px) -->
-                <button onclick="applyGlobalDirect()" class="w-full md:w-auto md:shrink-0 px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-2xl font-bold text-xs shadow-lg shadow-slate-200 transition-all active:scale-95 flex items-center justify-center gap-2 h-[50px]" data-i18n="applyAll">
+                <!-- 优化：高度精确匹配 -->
+                <button onclick="applyGlobalDirect()" class="w-full md:w-auto md:shrink-0 px-5 bg-slate-800 hover:bg-slate-900 text-white rounded-2xl font-bold text-xs shadow-lg shadow-slate-200 transition-all active:scale-95 flex items-center justify-center gap-2 h-[50px]" data-i18n="applyAll">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                     <span>应用设置</span>
                 </button>
@@ -192,7 +192,7 @@
         </div>
     </div>
 
-    <!-- 预览 Modal (大图标修复: 3x3 同样应用网格图标) -->
+    <!-- 预览 Modal (移除了快速预设) -->
     <div id="preview-modal" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/90 p-4">
         <div class="bg-white w-full max-w-6xl h-[90vh] rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden modal-enter relative">
             <div class="w-full md:w-80 bg-slate-50 border-r border-slate-200 flex flex-col shrink-0">
@@ -205,23 +205,6 @@
                 </div>
                 <div id="settings-container" class="mobile-settings-panel flex-grow p-4 space-y-3 closed">
                     
-                    <!-- 预设选择区 (3x3 图标同步优化) -->
-                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div class="w-full px-4 py-3 flex items-center gap-2 border-b border-slate-100 bg-slate-50/50"><svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z"></path></svg><span class="text-sm font-bold text-slate-700" data-i18n="applySettings">快速预设</span></div>
-                        <div class="p-4 grid grid-cols-4 gap-2">
-                            <button onclick="setPreviewPreset(1,2)" class="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 flex justify-center"><div class="w-4 h-6 border border-current rounded flex flex-col"><div class="flex-1 border-b border-current"></div><div class="flex-1"></div></div></button>
-                            <button onclick="setPreviewPreset(2,1)" class="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 flex justify-center"><div class="w-6 h-4 border border-current rounded flex"><div class="flex-1 border-r border-current"></div><div class="flex-1"></div></div></button>
-                            <button onclick="setPreviewPreset(2,2)" class="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 flex justify-center"><div class="w-6 h-6 border border-current rounded grid grid-cols-2 grid-rows-2"><div class="border-r border-b border-current"></div><div class="border-b border-current"></div><div class="border-r border-current"></div><div></div></div></button>
-                            <button onclick="setPreviewPreset(3,3)" class="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 flex justify-center">
-                                <div class="w-6 h-6 border border-current rounded grid grid-cols-3 grid-rows-3">
-                                    <div class="border-r border-b border-current"></div><div class="border-r border-b border-current"></div><div class="border-b border-current"></div>
-                                    <div class="border-r border-b border-current"></div><div class="border-r border-b border-current"></div><div class="border-b border-current"></div>
-                                    <div class="border-r border-current"></div><div class="border-r border-current"></div><div></div>
-                                </div>
-                            </button>
-                        </div>
-                    </div>
-
                     <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                         <div class="w-full px-4 py-3 flex items-center gap-2 border-b border-slate-100 bg-slate-50/50"><svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" stroke-width="2"></path></svg><span class="text-sm font-bold text-slate-700" data-i18n="sliceOrder">切片排序</span></div>
                         <div class="p-4"><select id="preview-order-select" class="w-full border rounded-lg px-3 py-2 text-sm font-bold"><option value="row" data-i18n="orderRow">行优先 (Z字形)</option><option value="col" data-i18n="orderCol">列优先 (N字形)</option></select></div>
@@ -353,35 +336,79 @@
         async function handleFiles(files) {
             if (!files.length) return;
             showLoading(t('parsing'), 0);
-            [els.uploadArea, els.pagesContainer, els.globalToolbar, els.bottomBar].forEach(el => el.classList.toggle('hidden', el === els.uploadArea));
+            
+            // 3. 超时机制：增加到60秒
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('解析超时，文件可能过大，建议拆分后重试')), 60000));
+            
             try {
-                for (const file of files) {
-                    let doc = null, storage = file;
-                    if (file.type === 'application/pdf') doc = await pdfjsLib.getDocument(await file.arrayBuffer()).promise;
-                    else if (file.type.startsWith('image/')) {
-                        const bytes = await imageToPdfBytes(file);
-                        storage = new Blob([bytes], {type:'application/pdf'}); storage.name = file.name;
-                        doc = await pdfjsLib.getDocument(bytes).promise;
-                    } else continue;
-                    
-                    const docId = state.nextDocId++;
-                    const formattedSize = formatFileSize(storage.size);
-                    state.documents.push({ id: docId, file: storage, pdfDoc: doc, fileName: file.name, fileSize: formattedSize });
-                    
-                    for (let i = 1; i <= doc.numPages; i++) {
-                        state.pages.push({ docId, pageIndexInDoc: i, cols: [], rows: [], rendered: false });
-                        createPageCard(state.pages.length - 1);
-                    }
-                }
-            } catch (e) { alert(t('alertParseError') + e.message); } finally { hideLoading(); els.fileInput.value = ''; }
+                // 使用 Promise.race 实现超时机制
+                await Promise.race([
+                    (async () => {
+                        [els.uploadArea, els.pagesContainer, els.globalToolbar, els.bottomBar].forEach(el => el.classList.toggle('hidden', el === els.uploadArea));
+                        
+                        for (const file of files) {
+                            let doc = null, storage = file;
+                            if (file.type === 'application/pdf') doc = await pdfjsLib.getDocument(await file.arrayBuffer()).promise;
+                            else if (file.type.startsWith('image/')) {
+                                // 2. 处理图片：统一使用 Canvas 转换逻辑，解决 SOI not found 问题
+                                const bytes = await imageToPdfBytes(file);
+                                storage = new Blob([bytes], {type:'application/pdf'}); storage.name = file.name;
+                                doc = await pdfjsLib.getDocument(bytes).promise;
+                            } else continue;
+                            
+                            const docId = state.nextDocId++;
+                            const formattedSize = formatFileSize(storage.size);
+                            state.documents.push({ id: docId, file: storage, pdfDoc: doc, fileName: file.name, fileSize: formattedSize });
+                            
+                            for (let i = 1; i <= doc.numPages; i++) {
+                                state.pages.push({ docId, pageIndexInDoc: i, cols: [], rows: [], rendered: false });
+                                createPageCard(state.pages.length - 1);
+                            }
+                        }
+                    })(),
+                    timeoutPromise
+                ]);
+            } catch (e) { 
+                alert(t('alertParseError') + e.message);
+                // 出错时恢复 UI
+                [els.uploadArea, els.pagesContainer, els.globalToolbar, els.bottomBar].forEach(el => el.classList.toggle('hidden', el !== els.uploadArea));
+            } finally { 
+                hideLoading(); 
+                els.fileInput.value = ''; 
+            }
         }
 
+        // 2. 增强版图片处理：使用 Canvas 归一化，支持更多格式
         async function imageToPdfBytes(file) {
-            const pdf = await PDFLib.PDFDocument.create(), buf = await file.arrayBuffer();
-            const img = file.type === 'image/png' ? await pdf.embedPng(buf) : await pdf.embedJpg(buf);
-            const page = pdf.addPage([img.width, img.height]);
-            page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
-            return await pdf.save();
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = async () => {
+                    try {
+                        const pdf = await PDFLib.PDFDocument.create();
+                        const img = new Image();
+                        img.src = reader.result;
+                        await img.decode(); // 等待图片解码
+
+                        // 使用 Canvas 将所有图片统一转为标准 PNG，解决格式兼容问题
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+                        
+                        // 转为 PNG 数据流
+                        const pngUrl = canvas.toDataURL('image/png');
+                        const pngImageBytes = await fetch(pngUrl).then(res => res.arrayBuffer());
+                        
+                        const embeddedImg = await pdf.embedPng(pngImageBytes);
+                        const page = pdf.addPage([img.width, img.height]);
+                        page.drawImage(embeddedImg, { x: 0, y: 0, width: img.width, height: img.height });
+                        resolve(await pdf.save());
+                    } catch (e) { reject(e); }
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
         }
 
         var observer = new IntersectionObserver(es => es.forEach(e => {
@@ -408,17 +435,19 @@
         }
 
         async function renderPageCanvas(idx) {
-            const p = state.pages[idx], doc = state.documents.find(d => d.id === p.docId), page = await doc.pdfDoc.getPage(p.pageIndexInDoc);
-            const cvs = $(`canvas-${idx}`);
-            const viewportRaw = page.getViewport({ scale: 1 });
-            const isHighRes = (viewportRaw.width * viewportRaw.height) > 3000000;
-            const visualWidth = Math.min(window.innerWidth - 32, 800);
-            const svp = page.getViewport({ scale: (visualWidth / viewportRaw.width) * (isHighRes ? 0.6 : 1.2) }); 
-            cvs.width = svp.width; cvs.height = svp.height;
-            cvs.style.width = "100%"; cvs.style.height = "auto";
-            cvs.parentElement.style.width = `${visualWidth}px`; cvs.parentElement.style.maxWidth = '100%';
-            await page.render({ canvasContext: cvs.getContext('2d'), viewport: svp }).promise;
-            $(`ph-${idx}`).remove(); p.rendered = true; renderLines(idx);
+            try {
+                const p = state.pages[idx], doc = state.documents.find(d => d.id === p.docId), page = await doc.pdfDoc.getPage(p.pageIndexInDoc);
+                const cvs = $(`canvas-${idx}`);
+                const viewportRaw = page.getViewport({ scale: 1 });
+                const isHighRes = (viewportRaw.width * viewportRaw.height) > 3000000;
+                const visualWidth = Math.min(window.innerWidth - 32, 800);
+                const svp = page.getViewport({ scale: (visualWidth / viewportRaw.width) * (isHighRes ? 0.6 : 1.2) }); 
+                cvs.width = svp.width; cvs.height = svp.height;
+                cvs.style.width = "100%"; cvs.style.height = "auto";
+                cvs.parentElement.style.width = `${visualWidth}px`; cvs.parentElement.style.maxWidth = '100%';
+                await page.render({ canvasContext: cvs.getContext('2d'), viewport: svp }).promise;
+                $(`ph-${idx}`).remove(); p.rendered = true; renderLines(idx);
+            } catch(e) { console.error("Render failed", e); }
         }
 
         function renderLines(idx) {
