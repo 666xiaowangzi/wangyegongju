@@ -337,42 +337,42 @@
             if (!files.length) return;
             showLoading(t('parsing'), 0);
             
-            // 3. 超时机制：增加到60秒
-            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('解析超时，文件可能过大，建议拆分后重试')), 60000));
-            
+            // 优化：不再熔断，而是提示等待
+            const slowMsgTimer = setTimeout(() => {
+                if(!els.loading.classList.contains('hidden')) {
+                    els.loadingText.textContent = "检测到大文件，解析时间较长，请耐心等待...";
+                }
+            }, 60000);
+
             try {
-                // 使用 Promise.race 实现超时机制
-                await Promise.race([
-                    (async () => {
-                        [els.uploadArea, els.pagesContainer, els.globalToolbar, els.bottomBar].forEach(el => el.classList.toggle('hidden', el === els.uploadArea));
-                        
-                        for (const file of files) {
-                            let doc = null, storage = file;
-                            if (file.type === 'application/pdf') doc = await pdfjsLib.getDocument(await file.arrayBuffer()).promise;
-                            else if (file.type.startsWith('image/')) {
-                                // 2. 处理图片：统一使用 Canvas 转换逻辑，解决 SOI not found 问题
-                                const bytes = await imageToPdfBytes(file);
-                                storage = new Blob([bytes], {type:'application/pdf'}); storage.name = file.name;
-                                doc = await pdfjsLib.getDocument(bytes).promise;
-                            } else continue;
-                            
-                            const docId = state.nextDocId++;
-                            const formattedSize = formatFileSize(storage.size);
-                            state.documents.push({ id: docId, file: storage, pdfDoc: doc, fileName: file.name, fileSize: formattedSize });
-                            
-                            for (let i = 1; i <= doc.numPages; i++) {
-                                state.pages.push({ docId, pageIndexInDoc: i, cols: [], rows: [], rendered: false });
-                                createPageCard(state.pages.length - 1);
-                            }
-                        }
-                    })(),
-                    timeoutPromise
-                ]);
+                // Remove Promise.race wrapper
+                [els.uploadArea, els.pagesContainer, els.globalToolbar, els.bottomBar].forEach(el => el.classList.toggle('hidden', el === els.uploadArea));
+                
+                for (const file of files) {
+                    let doc = null, storage = file;
+                    if (file.type === 'application/pdf') doc = await pdfjsLib.getDocument(await file.arrayBuffer()).promise;
+                    else if (file.type.startsWith('image/')) {
+                        // 2. 处理图片：统一使用 Canvas 转换逻辑，解决 SOI not found 问题
+                        const bytes = await imageToPdfBytes(file);
+                        storage = new Blob([bytes], {type:'application/pdf'}); storage.name = file.name;
+                        doc = await pdfjsLib.getDocument(bytes).promise;
+                    } else continue;
+                    
+                    const docId = state.nextDocId++;
+                    const formattedSize = formatFileSize(storage.size);
+                    state.documents.push({ id: docId, file: storage, pdfDoc: doc, fileName: file.name, fileSize: formattedSize });
+                    
+                    for (let i = 1; i <= doc.numPages; i++) {
+                        state.pages.push({ docId, pageIndexInDoc: i, cols: [], rows: [], rendered: false });
+                        createPageCard(state.pages.length - 1);
+                    }
+                }
             } catch (e) { 
                 alert(t('alertParseError') + e.message);
                 // 出错时恢复 UI
                 [els.uploadArea, els.pagesContainer, els.globalToolbar, els.bottomBar].forEach(el => el.classList.toggle('hidden', el !== els.uploadArea));
             } finally { 
+                clearTimeout(slowMsgTimer);
                 hideLoading(); 
                 els.fileInput.value = ''; 
             }
