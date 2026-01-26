@@ -121,7 +121,7 @@
             
             <div class="h-px bg-slate-100 w-full"></div>
 
-            <!-- 手动控制区 (布局优化：电脑端强制不换行) -->
+            <!-- 手动控制区 (布局优化：电脑端强制不换行，按钮高度修复) -->
             <div class="flex flex-col md:flex-row md:flex-nowrap items-center gap-3 w-full">
                 <div class="flex-grow grid grid-cols-2 gap-3 w-full md:w-auto">
                     <div class="bg-white border border-slate-100 rounded-2xl p-1.5 flex items-center justify-between shadow-sm">
@@ -141,7 +141,8 @@
                         </div>
                     </div>
                 </div>
-                <button onclick="applyGlobalDirect()" class="w-full md:w-auto md:shrink-0 px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-2xl font-bold text-xs shadow-lg shadow-slate-200 transition-all active:scale-95 flex items-center justify-center gap-2 h-[52px]" data-i18n="applyAll">
+                <!-- 优化：高度调整为 h-[50px] 以严格匹配输入框容器高度 (36+12+2=50px) -->
+                <button onclick="applyGlobalDirect()" class="w-full md:w-auto md:shrink-0 px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-2xl font-bold text-xs shadow-lg shadow-slate-200 transition-all active:scale-95 flex items-center justify-center gap-2 h-[50px]" data-i18n="applyAll">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                     <span>应用设置</span>
                 </button>
@@ -323,7 +324,7 @@
         
         var currentLang = 'zh';
         var i18n = {
-            zh: { appTitle: "PDF 超级分割工具", appSubtitle: "小王子", addFile: "添加", download: "下载", preview: "预演", batchSettings: "批量分割", batchDesc: "一键应用设置", cols: "列数", rows: "行数", applyAll: "应用到全部", clickUpload: "点击添加 PDF 或图片", slogan: "小王子为你施展分割魔法", pdfcraftDesc: "极致轻便的 PDF 在线处理工具箱", pdf24Desc: "免费且功能强大的离线级工具", applySettings: "应用分割参数", allPages: "所有页面", currentFile: "仅当前文件", pageRange: "页码范围", confirmApply: "确认应用", loadingMagic: "正在施展魔法...", parsing: "正在解析...", copy: "复制", loading: "加载中...", alertParseError: "失败: ", alertClear: "确定清空吗？", previewConsole: "高级输出控制台", consoleDesc: "调整后刷新", close: "继续编辑", loadMore: "加载更多", sliceRotation: "切片旋转", sliceOrder: "切片排序", orderRow: "行优先 (Z字)", orderCol: "列优先 (N字)", refreshPreview: "刷新预览", previewing: "正在生成预览...", downloadPDF: "下载 PDF", settingsToggle: "设置", cancel: "停止操作", cancelled: "操作已取消" },
+            zh: { appTitle: "PDF 超级分割工具", appSubtitle: "小王子", addFile: "添加", download: "下载", preview: "预演", batchSettings: "批量分割", batchDesc: "一键应用设置", cols: "列数", rows: "行数", applyAll: "应用设置", clickUpload: "点击添加 PDF 或图片", slogan: "小王子为你施展分割魔法", pdfcraftDesc: "极致轻便的 PDF 在线处理工具箱", pdf24Desc: "免费且功能强大的离线级工具", applySettings: "应用分割参数", allPages: "所有页面", currentFile: "仅当前文件", pageRange: "页码范围", confirmApply: "确认应用", loadingMagic: "正在施展魔法...", parsing: "正在解析...", copy: "复制", loading: "加载中...", alertParseError: "失败: ", alertClear: "确定清空吗？", previewConsole: "高级输出控制台", consoleDesc: "调整后刷新", close: "继续编辑", loadMore: "加载更多", sliceRotation: "切片旋转", sliceOrder: "切片排序", orderRow: "行优先 (Z字)", orderCol: "列优先 (N字)", refreshPreview: "刷新预览", previewing: "正在生成预览...", downloadPDF: "下载 PDF", settingsToggle: "设置", cancel: "停止操作", cancelled: "操作已取消" },
             en: { appTitle: "PDF Grid Cutter", appSubtitle: "Little Prince", addFile: "Add", download: "DL", preview: "Preview", batchSettings: "Batch", batchDesc: "Apply to all pages", cols: "Cols", rows: "Rows", applyAll: "Apply All", clickUpload: "Click/Drag PDF or Images", slogan: "Little Prince casts splitting magic", pdfcraftDesc: "Lightweight PDF online toolbox", pdf24Desc: "Powerful Offline Tools", applySettings: "Apply Settings", allPages: "All Pages", currentFile: "Current File", pageRange: "Range", confirmApply: "Apply", loadingMagic: "Casting magic...", parsing: "Parsing...", copy: "Copy", loading: "Loading...", alertParseError: "Error: ", alertClear: "Clear all?", previewConsole: "Console", consoleDesc: "Refresh to apply", close: "Edit", loadMore: "Load More", sliceRotation: "Rotation", sliceOrder: "Order", orderRow: "Row Major", orderCol: "Col Major", refreshPreview: "Refresh", previewing: "Generating Preview...", downloadPDF: "Download PDF", settingsToggle: "Settings", cancel: "Cancel", cancelled: "Operation Cancelled" }
         };
 
