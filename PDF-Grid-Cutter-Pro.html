@@ -18,7 +18,10 @@
         .line-row { left: 0; right: 0; height: 2px; background: #3b82f6; cursor: row-resize; }
         .line-col::after { content: ''; position: absolute; left: -15px; right: -15px; top: 0; bottom: 0; }
         .line-row::after { content: ''; position: absolute; top: -15px; bottom: -15px; left: 0; right: 0; }
-        .active { box-shadow: 0 0 12px #ef4444; background: #ef4444; z-index: 60; }
+        
+        /* 激活状态：区分颜色 */
+        .line-col.active { box-shadow: 0 0 12px #ef4444; background: #ef4444; z-index: 60; }
+        .line-row.active { box-shadow: 0 0 12px #3b82f6; background: #3b82f6; z-index: 60; }
         
         /* 动画与过渡 */
         .modal-enter { animation: pop 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
@@ -83,7 +86,7 @@
                  <!-- 标题区 -->
                 <div class="flex items-center gap-3 w-full md:w-auto">
                     <div class="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl shrink-0">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z"></path></svg>
                     </div>
                     <div>
                         <span class="text-sm font-bold text-slate-800 block" data-i18n="batchSettings">批量网格</span>
@@ -91,7 +94,7 @@
                     </div>
                 </div>
 
-                <!-- 快捷预设按钮组 (新增 3x1) -->
+                <!-- 快捷预设按钮组 -->
                 <div class="flex gap-2">
                     <button onclick="setPreset(1,2)" class="preset-btn p-2 rounded-lg bg-white border border-slate-200 text-slate-600" title="1列2行">
                         <div class="w-4 h-5 border border-current rounded flex flex-col"><div class="flex-1 border-b border-current"></div><div class="flex-1"></div></div>
@@ -105,8 +108,13 @@
                     <button onclick="setPreset(2,2)" class="preset-btn p-2 rounded-lg bg-white border border-slate-200 text-slate-600" title="2列2行">
                         <div class="w-5 h-5 border border-current rounded grid grid-cols-2 grid-rows-2"><div class="border-r border-b border-current"></div><div class="border-b border-current"></div><div class="border-r border-current"></div><div></div></div>
                     </button>
+                    <!-- 3x3 图标图形化优化 -->
                     <button onclick="setPreset(3,3)" class="preset-btn p-2 rounded-lg bg-white border border-slate-200 text-slate-600" title="3列3行">
-                        <div class="w-5 h-5 border border-current rounded grid grid-cols-3 grid-rows-3 text-[4px] leading-none text-center"><div class="col-span-3 row-span-3 flex items-center justify-center">3x3</div></div>
+                        <div class="w-5 h-5 border border-current rounded grid grid-cols-3 grid-rows-3">
+                            <div class="border-r border-b border-current"></div><div class="border-r border-b border-current"></div><div class="border-b border-current"></div>
+                            <div class="border-r border-b border-current"></div><div class="border-r border-b border-current"></div><div class="border-b border-current"></div>
+                            <div class="border-r border-current"></div><div class="border-r border-current"></div><div></div>
+                        </div>
                     </button>
                 </div>
             </div>
@@ -133,7 +141,6 @@
                         </div>
                     </div>
                 </div>
-                <!-- 优化：缩小按钮尺寸，使用 flex-shrink-0 防止压缩，h-auto 适配高度 -->
                 <button onclick="applyGlobalDirect()" class="w-full md:w-auto md:shrink-0 px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-2xl font-bold text-xs shadow-lg shadow-slate-200 transition-all active:scale-95 flex items-center justify-center gap-2 h-[52px]" data-i18n="applyAll">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                     <span>应用设置</span>
@@ -184,7 +191,7 @@
         </div>
     </div>
 
-    <!-- 预览 Modal (大图标修复: 2列2行田字格) -->
+    <!-- 预览 Modal (大图标修复: 3x3 同样应用网格图标) -->
     <div id="preview-modal" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/90 p-4">
         <div class="bg-white w-full max-w-6xl h-[90vh] rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden modal-enter relative">
             <div class="w-full md:w-80 bg-slate-50 border-r border-slate-200 flex flex-col shrink-0">
@@ -197,15 +204,20 @@
                 </div>
                 <div id="settings-container" class="mobile-settings-panel flex-grow p-4 space-y-3 closed">
                     
-                    <!-- 预设选择区 (这里也同步更新图标) -->
+                    <!-- 预设选择区 (3x3 图标同步优化) -->
                     <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div class="w-full px-4 py-3 flex items-center gap-2 border-b border-slate-100 bg-slate-50/50"><svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg><span class="text-sm font-bold text-slate-700" data-i18n="applySettings">快速预设</span></div>
+                        <div class="w-full px-4 py-3 flex items-center gap-2 border-b border-slate-100 bg-slate-50/50"><svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z"></path></svg><span class="text-sm font-bold text-slate-700" data-i18n="applySettings">快速预设</span></div>
                         <div class="p-4 grid grid-cols-4 gap-2">
                             <button onclick="setPreviewPreset(1,2)" class="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 flex justify-center"><div class="w-4 h-6 border border-current rounded flex flex-col"><div class="flex-1 border-b border-current"></div><div class="flex-1"></div></div></button>
                             <button onclick="setPreviewPreset(2,1)" class="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 flex justify-center"><div class="w-6 h-4 border border-current rounded flex"><div class="flex-1 border-r border-current"></div><div class="flex-1"></div></div></button>
-                            <!-- 2x2 图标修复: 使用 grid 代替 flex 布局 -->
                             <button onclick="setPreviewPreset(2,2)" class="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 flex justify-center"><div class="w-6 h-6 border border-current rounded grid grid-cols-2 grid-rows-2"><div class="border-r border-b border-current"></div><div class="border-b border-current"></div><div class="border-r border-current"></div><div></div></div></button>
-                            <button onclick="setPreviewPreset(3,3)" class="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 flex justify-center"><div class="w-6 h-6 border border-current rounded grid grid-cols-3 grid-rows-3 text-[5px] flex items-center justify-center font-bold">3x3</div></button>
+                            <button onclick="setPreviewPreset(3,3)" class="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 flex justify-center">
+                                <div class="w-6 h-6 border border-current rounded grid grid-cols-3 grid-rows-3">
+                                    <div class="border-r border-b border-current"></div><div class="border-r border-b border-current"></div><div class="border-b border-current"></div>
+                                    <div class="border-r border-b border-current"></div><div class="border-r border-b border-current"></div><div class="border-b border-current"></div>
+                                    <div class="border-r border-current"></div><div class="border-r border-current"></div><div></div>
+                                </div>
+                            </button>
                         </div>
                     </div>
 
@@ -311,8 +323,8 @@
         
         var currentLang = 'zh';
         var i18n = {
-            zh: { appTitle: "PDF 超级分割工具", appSubtitle: "小王子", addFile: "添加", download: "下载", preview: "预演", batchSettings: "批量分割", batchDesc: "一键应用设置", cols: "列数", rows: "行数", applyAll: "应用设置", clickUpload: "点击添加 PDF 或图片", slogan: "小王子为你施展分割魔法", pdfcraftDesc: "极致轻便的 PDF 在线处理工具箱", pdf24Desc: "免费且功能强大的离线级工具", applySettings: "应用分割参数", allPages: "所有页面", currentFile: "仅当前文件", pageRange: "页码范围", confirmApply: "确认应用", loadingMagic: "正在施展魔法...", parsing: "正在解析...", copy: "复制", loading: "加载中...", alertParseError: "失败: ", alertClear: "确定清空吗？", previewConsole: "高级输出控制台", consoleDesc: "调整后刷新", close: "继续编辑", loadMore: "加载更多", sliceRotation: "切片旋转", sliceOrder: "切片排序", orderRow: "行优先 (Z字)", orderCol: "列优先 (N字)", refreshPreview: "刷新预览", downloadPDF: "下载 PDF", settingsToggle: "设置", cancel: "停止操作", cancelled: "操作已取消" },
-            en: { appTitle: "PDF Grid Cutter", appSubtitle: "Little Prince", addFile: "Add", download: "DL", preview: "Preview", batchSettings: "Batch", batchDesc: "Apply to all pages", cols: "Cols", rows: "Rows", applyAll: "Apply All", clickUpload: "Click/Drag PDF or Images", slogan: "Little Prince casts splitting magic", pdfcraftDesc: "Lightweight PDF online toolbox", pdf24Desc: "Powerful Offline Tools", applySettings: "Apply Settings", allPages: "All Pages", currentFile: "Current File", pageRange: "Range", confirmApply: "Apply", loadingMagic: "Casting magic...", parsing: "Parsing...", copy: "Copy", loading: "Loading...", alertParseError: "Error: ", alertClear: "Clear all?", previewConsole: "Console", consoleDesc: "Refresh to apply", close: "Edit", loadMore: "Load More", sliceRotation: "Rotation", sliceOrder: "Order", orderRow: "Row Major", orderCol: "Col Major", refreshPreview: "Refresh", downloadPDF: "Download PDF", settingsToggle: "Settings", cancel: "Cancel", cancelled: "Operation Cancelled" }
+            zh: { appTitle: "PDF 超级分割工具", appSubtitle: "小王子", addFile: "添加", download: "下载", preview: "预演", batchSettings: "批量分割", batchDesc: "一键应用设置", cols: "列数", rows: "行数", applyAll: "应用到全部", clickUpload: "点击添加 PDF 或图片", slogan: "小王子为你施展分割魔法", pdfcraftDesc: "极致轻便的 PDF 在线处理工具箱", pdf24Desc: "免费且功能强大的离线级工具", applySettings: "应用分割参数", allPages: "所有页面", currentFile: "仅当前文件", pageRange: "页码范围", confirmApply: "确认应用", loadingMagic: "正在施展魔法...", parsing: "正在解析...", copy: "复制", loading: "加载中...", alertParseError: "失败: ", alertClear: "确定清空吗？", previewConsole: "高级输出控制台", consoleDesc: "调整后刷新", close: "继续编辑", loadMore: "加载更多", sliceRotation: "切片旋转", sliceOrder: "切片排序", orderRow: "行优先 (Z字)", orderCol: "列优先 (N字)", refreshPreview: "刷新预览", previewing: "正在生成预览...", downloadPDF: "下载 PDF", settingsToggle: "设置", cancel: "停止操作", cancelled: "操作已取消" },
+            en: { appTitle: "PDF Grid Cutter", appSubtitle: "Little Prince", addFile: "Add", download: "DL", preview: "Preview", batchSettings: "Batch", batchDesc: "Apply to all pages", cols: "Cols", rows: "Rows", applyAll: "Apply All", clickUpload: "Click/Drag PDF or Images", slogan: "Little Prince casts splitting magic", pdfcraftDesc: "Lightweight PDF online toolbox", pdf24Desc: "Powerful Offline Tools", applySettings: "Apply Settings", allPages: "All Pages", currentFile: "Current File", pageRange: "Range", confirmApply: "Apply", loadingMagic: "Casting magic...", parsing: "Parsing...", copy: "Copy", loading: "Loading...", alertParseError: "Error: ", alertClear: "Clear all?", previewConsole: "Console", consoleDesc: "Refresh to apply", close: "Edit", loadMore: "Load More", sliceRotation: "Rotation", sliceOrder: "Order", orderRow: "Row Major", orderCol: "Col Major", refreshPreview: "Refresh", previewing: "Generating Preview...", downloadPDF: "Download PDF", settingsToggle: "Settings", cancel: "Cancel", cancelled: "Operation Cancelled" }
         };
 
         function t(k) { return i18n[currentLang][k] || k; }
@@ -479,7 +491,9 @@
 
         window.refreshPreview = () => {
             state.outputSettings.sortOrder = $('preview-order-select').value; state.previewPageNum = 1; els.previewContent.innerHTML = '';
-            els.loadingBar.style.width = '100%'; els.loadingPercent.textContent = 'Previewing...';
+            els.loadingBar.style.width = '100%'; 
+            // 使用汉化后的提示语
+            els.loadingPercent.textContent = t('previewing');
             els.loading.classList.remove('hidden'); 
             
             setTimeout(async () => { try { state.previewPdfDoc = await generateFinalPDF(true); await renderMorePreview(5); } catch(e) { alert(e.message); } finally { hideLoading(); } }, 50);
