@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>文字拆图</title>
+    <title>文字拆图 (高性能+多端适配版)</title>
     <link href="https://fonts.googleapis.com/css2?family=Liu+Jian+Mao+Cao&family=Long+Cang&family=Ma+Shan+Zheng&family=Noto+Sans+SC:wght@400;700;900&family=Noto+Serif+SC:wght@700&family=Zhi+Mang+Xing&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
@@ -45,13 +45,20 @@
             align-items: center;
             gap: 8px;
         }
-        .form-group { margin-bottom: 18px; }
+        .form-group { margin-bottom: 18px; position: relative; }
         .form-group label { 
             display: block; 
             margin-bottom: 6px; 
             font-weight: 600; 
             font-size: 0.9rem; 
             color: #4B5563;
+        }
+        .char-count {
+            position: absolute;
+            right: 0;
+            top: 0;
+            font-size: 0.8rem;
+            color: #6B7280;
         }
         input[type="text"], input[type="number"], select, textarea {
             width: 100%;
@@ -83,7 +90,6 @@
             background: #fff;
         }
         
-        /* 滑块样式 */
         .slider-group {
             background: #F9FAFB;
             padding: 12px;
@@ -98,10 +104,7 @@
             margin-bottom: 8px;
             font-weight: bold;
         }
-        input[type="range"] {
-            width: 100%;
-            accent-color: var(--primary);
-        }
+        input[type="range"] { width: 100%; accent-color: var(--primary); }
         
         .toggle-label {
             display: flex;
@@ -129,6 +132,7 @@
         .btn-generate:hover { background-color: var(--primary-hover); transform: translateY(-1px); }
         .btn-download { background-color: #10B981; color: white; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2); margin-bottom: 0; }
         .btn-download:hover { background-color: #059669; transform: translateY(-1px); }
+        .btn-download:disabled { background-color: #9CA3AF; cursor: not-allowed; box-shadow: none; }
         
         .preview-panel {
             background: var(--bg);
@@ -152,7 +156,8 @@
             transition: transform 0.2s;
         }
         canvas:hover { transform: scale(1.02); }
-        .help-text { font-size: 0.8rem; color: #6B7280; margin-top: 6px; }
+        .help-text { font-size: 0.8rem; color: #6B7280; margin-top: 6px; line-height: 1.4; }
+        .warning-text { color: #EF4444; font-weight: bold; margin-top: 10px; display: none; }
 
         @media (max-width: 800px) {
             .container { grid-template-columns: 1fr; }
@@ -177,11 +182,12 @@
         
         <div class="form-group">
             <label>输入文字</label>
-            <textarea id="inputText" oninput="autoGenerate()" placeholder="输入你想生成的文字...">小王子!</textarea>
+            <span class="char-count" id="charCount">0/500</span>
+            <textarea id="inputText" maxlength="500" oninput="autoGenerate()" placeholder="输入你想生成的文字...">小王子!</textarea>
         </div>
 
         <div class="form-group">
-            <label>单图字数 (多少个字拼在一张图上)</label>
+            <label>单图字数</label>
             <input type="number" id="charsPerImg" oninput="autoGenerate()" value="1" min="1" max="20">
         </div>
 
@@ -200,25 +206,20 @@
             <label>选择字体</label>
             <select id="fontFamily" onchange="autoGenerate()">
                 <optgroup label="手写 & 毛笔风 (推荐)">
-                    <option value="'Ma Shan Zheng', cursive" selected>马善政毛笔 (稳重手写)</option>
-                    <option value="'Zhi Mang Xing', cursive">志莽行书 (潇洒行草)</option>
-                    <option value="'Liu Jian Mao Cao', cursive">刘建毛草 (狂放草书)</option>
-                    <option value="'Long Cang', cursive">龙藏体 (灵动手写)</option>
+                    <option value="'Ma Shan Zheng', cursive" selected>马善政毛笔</option>
+                    <option value="'Zhi Mang Xing', cursive">志莽行书</option>
+                    <option value="'Liu Jian Mao Cao', cursive">刘建毛草</option>
+                    <option value="'Long Cang', cursive">龙藏体</option>
                 </optgroup>
                 <optgroup label="经典排版风">
-                    <option value="'Noto Serif SC', serif">思源宋体 (复古/学术)</option>
-                    <option value="'Noto Sans SC', sans-serif">思源黑体 (现代/简约)</option>
-                </optgroup>
-                <optgroup label="系统自带字体">
-                    <option value="'KaiTi', 'STKaiti', serif">系统楷体</option>
-                    <option value="'SimSun', serif">系统宋体</option>
-                    <option value="'Microsoft YaHei', sans-serif">微软雅黑</option>
+                    <option value="'Noto Serif SC', serif">思源宋体</option>
+                    <option value="'Noto Sans SC', sans-serif">思源黑体</option>
                 </optgroup>
             </select>
         </div>
 
         <div class="form-group">
-            <label>图片尺寸 (默认手机壁纸 9:16)</label>
+            <label>图片尺寸 (默认 9:16)</label>
             <div class="flex-row">
                 <input type="number" id="imgWidth" oninput="autoGenerate()" value="1080" placeholder="宽">
                 <input type="number" id="imgHeight" oninput="autoGenerate()" value="1920" placeholder="高">
@@ -226,7 +227,6 @@
         </div>
 
         <h2 style="margin-top: 25px;">✨ 高级手绘参数</h2>
-        
         <label class="toggle-label">
             <input type="checkbox" id="enableHandDrawn" onchange="autoGenerate()" checked>
             开启边缘毛糙手绘效果
@@ -234,102 +234,154 @@
         
         <div id="advancedControls">
             <div class="slider-group">
-                <div class="slider-header">
-                    <span>边缘毛糙度 (扭曲)</span>
-                    <span id="valDistortion">5</span>
-                </div>
+                <div class="slider-header"><span>边缘毛糙度</span><span id="valDistortion">5</span></div>
                 <input type="range" id="distortionScale" min="0" max="20" step="1" value="5" oninput="updateFilters()">
-                <div class="help-text">值越大，边缘像水墨晕染或粉笔化得越厉害。</div>
             </div>
-
             <div class="slider-group">
-                <div class="slider-header">
-                    <span>笔触颗粒感 (密度)</span>
-                    <span id="valNoise">0.15</span>
-                </div>
+                <div class="slider-header"><span>笔触颗粒感</span><span id="valNoise">0.15</span></div>
                 <input type="range" id="noiseFreq" min="0.01" max="0.3" step="0.01" value="0.15" oninput="updateFilters()">
-                <div class="help-text">值越大，边缘破碎的颗粒越细密。</div>
             </div>
-
             <div class="slider-group">
-                <div class="slider-header">
-                    <span>文字加粗 (描边厚度)</span>
-                    <span id="valStroke">2</span>
-                </div>
+                <div class="slider-header"><span>文字加粗</span><span id="valStroke">2</span></div>
                 <input type="range" id="strokeWidth" min="0" max="40" step="1" value="2" oninput="autoGenerate()">
-                <div class="help-text">补充原字体太细的问题，增加分量感。</div>
             </div>
         </div>
 
         <button class="btn btn-generate" onclick="generateImages()" style="margin-top: 15px;">强制刷新生成</button>
         
         <div id="downloadArea" style="display: none; margin-top: 15px; background: #F9FAFB; padding: 15px; border-radius: 8px; border: 1px solid var(--border);">
-            <label class="toggle-label" style="font-size: 0.9rem; color: #4B5563; padding-top: 0; margin-bottom: 10px;">
-                <input type="checkbox" id="useZip">
+            <label class="toggle-label" style="font-size: 0.95rem; color: #1F2937; padding-top: 0; margin-bottom: 8px;">
+                <input type="checkbox" id="useZip" onchange="toggleIntervalSetting()">
                 打包成 ZIP 压缩包下载
             </label>
-            <button class="btn btn-download" onclick="downloadAll()">💾 批量保存高清原图</button>
+            
+            <div id="intervalSetting" style="margin-bottom: 12px; padding: 10px; background: #fff; border-radius: 6px; border: 1px solid #E5E7EB;">
+                <label style="font-size: 0.85rem; font-weight: bold; color: #4B5563; display: block; margin-bottom: 6px;">
+                    普通多图下载间隔 (毫秒)
+                </label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="number" id="downloadInterval" style="width: 100px; padding: 6px; font-size: 0.9rem;" min="0" step="100">
+                    <span style="font-size: 0.8rem; color: #6B7280;">(1秒 = 1000毫秒)</span>
+                </div>
+                <div class="help-text" style="color: #D97706; margin-top: 8px;">
+                    💡 备注：手机浏览器机制极其容易拦截瞬间连续下载。<br>
+                    <span id="deviceType" style="font-weight:bold; color: #4F46E5;"></span>
+                </div>
+            </div>
+
+            <button class="btn btn-download" id="dlButton" onclick="downloadAll()">💾 保存所有原图</button>
             <div id="statusMsg" class="help-text" style="color: #10B981; font-weight: bold; text-align: center; margin-top: 10px;"></div>
         </div>
     </div>
 
     <div class="panel preview-panel">
         <h2 style="padding: 20px 20px 0 20px; border:none; margin:0;">👀 实时预览图</h2>
-        <div class="help-text" style="padding: 0 20px;">所见即所得。调整左侧参数，这里会实时变化。（显示为缩略图，保存为高清大图）</div>
+        <div class="help-text" style="padding: 0 20px;">
+            提示：为防止浏览器卡死，这里最多只预览前 <span style="color:var(--primary);font-weight:bold;">30</span> 张图。下载时会自动生成所有图片。
+        </div>
+        <div id="previewWarning" class="warning-text" style="padding: 0 20px;">⚠️ 文字较多，仅展示部分预览。强烈建议使用 ZIP 打包下载全部图片。</div>
         <div class="canvas-container" style="padding: 0 20px 20px 20px;" id="canvasContainer"></div>
     </div>
 </div>
 
 <script>
     let debounceTimer;
+    const MAX_PREVIEW_LIMIT = 30;
 
-    // 分离文本
-    function splitText(text) {
-        return Array.from(text);
+    // 设备嗅探与初始化
+    function initDeviceSettings() {
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const intervalInput = document.getElementById('downloadInterval');
+        const deviceTypeSpan = document.getElementById('deviceType');
+        
+        if (isMobile) {
+            intervalInput.value = 1000;
+            deviceTypeSpan.innerText = '已识别为手机端，建议延迟保持 1000ms 左右。';
+        } else {
+            intervalInput.value = 200;
+            deviceTypeSpan.innerText = '已识别为电脑端，宽带允许下可设为 200ms。';
+        }
     }
 
-    // 实时更新 SVG 滤镜参数
+    // 切换 ZIP 和普通间隔的显示状态
+    function toggleIntervalSetting() {
+        const isZip = document.getElementById('useZip').checked;
+        const intervalSetting = document.getElementById('intervalSetting');
+        // 勾选 ZIP 时不需要间隔参数，隐藏使其更简洁
+        intervalSetting.style.display = isZip ? 'none' : 'block';
+    }
+
+    function splitText(text) { return Array.from(text); }
+
     function updateFilters() {
         const scale = document.getElementById('distortionScale').value;
         const freq = document.getElementById('noiseFreq').value;
-        
         document.getElementById('valDistortion').innerText = scale;
         document.getElementById('valNoise').innerText = freq;
-        
         document.getElementById('svgDisplacement').setAttribute('scale', scale);
         document.getElementById('svgTurbulence').setAttribute('baseFrequency', freq);
-        
         autoGenerate(); 
     }
 
-    // 防抖自动生成
     function autoGenerate() {
+        const textVal = document.getElementById('inputText').value;
+        document.getElementById('charCount').innerText = `${textVal.length}/500`;
         document.getElementById('valStroke').innerText = document.getElementById('strokeWidth').value;
         
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-            generateImages();
-        }, 50); 
+        debounceTimer = setTimeout(() => { generateImages(); }, 300); 
+    }
+
+    function drawOnCanvas(canvas, groupText, config) {
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        
+        ctx.fillStyle = config.bgColor;
+        ctx.fillRect(0, 0, config.width, config.height);
+        
+        const maxFontSizeByWidth = (config.width / groupText.length) * 0.85; 
+        const maxFontSizeByHeight = config.height * 0.8;
+        const fontSize = Math.min(maxFontSizeByWidth, maxFontSizeByHeight);
+        
+        ctx.font = `${fontSize}px ${config.fontFamily}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        if (config.isHandDrawn) ctx.filter = 'url(#handDrawnFilter)';
+        else ctx.filter = 'none';
+
+        ctx.fillStyle = config.textColor;
+        ctx.fillText(groupText, config.width / 2, config.height / 2);
+        
+        if (config.extraStroke > 0) {
+            ctx.strokeStyle = config.textColor;
+            ctx.lineWidth = config.extraStroke;
+            ctx.lineJoin = 'round';
+            ctx.strokeText(groupText, config.width / 2, config.height / 2);
+        }
+        ctx.filter = 'none';
+    }
+
+    function getConfig() {
+        return {
+            textColor: document.getElementById('textColor').value,
+            bgColor: document.getElementById('bgColor').value,
+            fontFamily: document.getElementById('fontFamily').value,
+            width: parseInt(document.getElementById('imgWidth').value) || 1080,
+            height: parseInt(document.getElementById('imgHeight').value) || 1920,
+            isHandDrawn: document.getElementById('enableHandDrawn').checked,
+            extraStroke: parseInt(document.getElementById('strokeWidth').value) || 0
+        };
     }
 
     function generateImages() {
         const text = document.getElementById('inputText').value.replace(/\n/g, ''); 
         const charsPerImg = parseInt(document.getElementById('charsPerImg').value) || 1;
-        const textColor = document.getElementById('textColor').value;
-        const bgColor = document.getElementById('bgColor').value;
-        const fontFamily = document.getElementById('fontFamily').value;
-        const width = parseInt(document.getElementById('imgWidth').value) || 1080;
-        const height = parseInt(document.getElementById('imgHeight').value) || 1920;
-        
-        const isHandDrawn = document.getElementById('enableHandDrawn').checked;
-        const extraStroke = parseInt(document.getElementById('strokeWidth').value) || 0;
-        
         const container = document.getElementById('canvasContainer');
         const downloadArea = document.getElementById('downloadArea');
-        const statusMsg = document.getElementById('statusMsg');
+        const previewWarning = document.getElementById('previewWarning');
         
         container.innerHTML = '';
-        statusMsg.innerHTML = '';
+        previewWarning.style.display = 'none';
 
         if (!text) {
             container.innerHTML = '<div style="color:#9CA3AF; padding: 20px;">等待输入文字...</div>';
@@ -339,118 +391,128 @@
 
         const chars = splitText(text);
         const groups = [];
-        
         for (let i = 0; i < chars.length; i += charsPerImg) {
             groups.push(chars.slice(i, i + charsPerImg).join(''));
         }
 
-        groups.forEach((groupText) => {
+        const config = getConfig();
+        const totalImages = groups.length;
+        
+        const previewGroups = groups.slice(0, MAX_PREVIEW_LIMIT);
+        
+        if (totalImages > MAX_PREVIEW_LIMIT) {
+            previewWarning.style.display = 'block';
+            previewWarning.innerText = `⚠️ 共计 ${totalImages} 张图，已隐藏 ${totalImages - MAX_PREVIEW_LIMIT} 张以防卡顿。打包下载时会获取全部。`;
+            document.getElementById('useZip').checked = true; 
+            toggleIntervalSetting();
+        }
+
+        previewGroups.forEach((groupText) => {
             const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            canvas.className = 'result-canvas';
-            
-            const ctx = canvas.getContext('2d');
-            
-            ctx.fillStyle = bgColor;
-            ctx.fillRect(0, 0, width, height);
-            
-            const maxFontSizeByWidth = (width / groupText.length) * 0.85; 
-            const maxFontSizeByHeight = height * 0.8;
-            const fontSize = Math.min(maxFontSizeByWidth, maxFontSizeByHeight);
-            
-            ctx.font = `${fontSize}px ${fontFamily}`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            
-            if (isHandDrawn) {
-                ctx.filter = 'url(#handDrawnFilter)';
-            } else {
-                ctx.filter = 'none';
-            }
-
-            ctx.fillStyle = textColor;
-            ctx.fillText(groupText, width / 2, height / 2);
-            
-            if (extraStroke > 0) {
-                ctx.strokeStyle = textColor;
-                ctx.lineWidth = extraStroke;
-                ctx.lineJoin = 'round';
-                ctx.strokeText(groupText, width / 2, height / 2);
-            }
-
-            ctx.filter = 'none';
+            canvas.width = config.width;
+            canvas.height = config.height;
+            drawOnCanvas(canvas, groupText, config);
             container.appendChild(canvas);
         });
 
         if (groups.length > 0) {
             downloadArea.style.display = 'block';
         }
+        
+        window.__currentGroups = groups;
     }
 
-    // 处理批量下载与ZIP打包
-    async function downloadAll() {
-        const canvases = document.querySelectorAll('.result-canvas');
-        if (canvases.length === 0) return;
+    function generateDataUrlAsync(groupText, config) {
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                const canvas = document.createElement('canvas');
+                canvas.width = config.width;
+                canvas.height = config.height;
+                drawOnCanvas(canvas, groupText, config);
+                const dataUrl = canvas.toDataURL('image/png', 1.0);
+                
+                canvas.width = 0;
+                canvas.height = 0; 
+                resolve(dataUrl);
+            }, 10); 
+        });
+    }
 
-        const statusMsg = document.getElementById('statusMsg');
+    async function downloadAll() {
+        const groups = window.__currentGroups;
+        if (!groups || groups.length === 0) return;
+
         const isZip = document.getElementById('useZip').checked;
         const textPrefix = document.getElementById('inputText').value.substring(0, 2) || "文字";
+        const config = getConfig();
+        const statusMsg = document.getElementById('statusMsg');
+        const dlButton = document.getElementById('dlButton');
+        // 获取用户自定义的延迟时间
+        const userDelay = parseInt(document.getElementById('downloadInterval').value) || 200;
+
+        if (!isZip && groups.length > 30) {
+            alert(`数量极多 (${groups.length}张)，逐张下载大概率会导致浏览器崩溃或被拦截拦截。已强制为您勾选“打包成 ZIP”！`);
+            document.getElementById('useZip').checked = true;
+            toggleIntervalSetting();
+            return;
+        }
+
+        dlButton.disabled = true;
 
         if (isZip) {
-            // ZIP 打包下载逻辑
-            statusMsg.innerHTML = "📦 正在打包 ZIP，请稍候...";
+            statusMsg.innerHTML = "📦 后台拼命生成和压缩中，请不要关闭页面...";
             try {
                 const zip = new JSZip();
-                canvases.forEach((canvas, index) => {
-                    const fileIndex = (index + 1).toString().padStart(2, '0');
-                    const dataUrl = canvas.toDataURL('image/png', 1.0);
-                    // 移除 base64 的头部说明
+                
+                for (let i = 0; i < groups.length; i++) {
+                    const fileIndex = (i + 1).toString().padStart(3, '0');
+                    statusMsg.innerHTML = `📦 正在生成第 ${i+1}/${groups.length} 张...`;
+                    
+                    const dataUrl = await generateDataUrlAsync(groups[i], config);
                     const base64Data = dataUrl.replace(/^data:image\/(png|jpg);base64,/, "");
                     zip.file(`手绘文字_${textPrefix}_${fileIndex}.png`, base64Data, {base64: true});
-                });
+                }
 
+                statusMsg.innerHTML = "📦 图片生成完毕，正在打包 ZIP (这可能需要几秒钟)...";
                 const content = await zip.generateAsync({type:"blob"});
+                
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(content);
                 link.download = `手绘文字_${textPrefix}_打包.zip`;
                 link.click();
                 
+                setTimeout(() => URL.revokeObjectURL(link.href), 5000); 
                 statusMsg.innerHTML = "✅ ZIP 压缩包下载完成！";
+
             } catch (error) {
                 console.error(error);
-                statusMsg.innerHTML = "❌ ZIP 打包失败，请尝试取消勾选进行普通下载。";
+                statusMsg.innerHTML = "❌ 打包失败，内容可能过多。";
             }
-            
-            setTimeout(() => statusMsg.innerHTML = "", 5000);
-
         } else {
-            // 普通逐张下载逻辑
-            statusMsg.innerHTML = "⬇️ 逐张保存中，请允许浏览器下载多张图片...";
+            statusMsg.innerHTML = "⬇️ 逐张后台生成并保存中，请允许浏览器多文件下载...";
             
-            canvases.forEach((canvas, index) => {
-                // 间隔加大到 800ms，进一步防拦截
-                setTimeout(() => {
-                    const link = document.createElement('a');
-                    const fileIndex = (index + 1).toString().padStart(2, '0');
-                    link.download = `手绘文字_${textPrefix}_${fileIndex}.png`;
-                    link.href = canvas.toDataURL('image/png', 1.0); 
-                    link.click();
-                    
-                    if (index === canvases.length - 1) {
-                        setTimeout(() => {
-                            statusMsg.innerHTML = "✅ 保存完成！请在浏览器下载记录中查看。";
-                            setTimeout(() => statusMsg.innerHTML = "", 5000);
-                        }, 800);
-                    }
-                }, index * 800); 
-            });
+            for (let i = 0; i < groups.length; i++) {
+                const fileIndex = (i + 1).toString().padStart(3, '0');
+                const dataUrl = await generateDataUrlAsync(groups[i], config);
+                
+                const link = document.createElement('a');
+                link.download = `手绘文字_${textPrefix}_${fileIndex}.png`;
+                link.href = dataUrl;
+                link.click();
+                
+                // 使用用户自定义的延迟时间
+                await new Promise(r => setTimeout(r, userDelay));
+            }
+            statusMsg.innerHTML = "✅ 全部保存完成！";
         }
+
+        dlButton.disabled = false;
+        setTimeout(() => statusMsg.innerHTML = "", 5000);
     }
 
-    // 页面加载完成后自动初始化渲染一次
-    window.onload = () => {
-        setTimeout(autoGenerate, 200);
+    window.onload = () => { 
+        initDeviceSettings(); // 初始化设备信息和默认间隔
+        setTimeout(autoGenerate, 200); 
     };
 </script>
 
