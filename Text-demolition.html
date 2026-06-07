@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>文字拆图</title>
-    <!-- 引入更多谷歌开源中文字体 -->
     <link href="https://fonts.googleapis.com/css2?family=Liu+Jian+Mao+Cao&family=Long+Cang&family=Ma+Shan+Zheng&family=Noto+Sans+SC:wght@400;700;900&family=Noto+Serif+SC:wght@700&family=Zhi+Mang+Xing&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         :root {
             --primary: #4F46E5;
@@ -127,7 +127,7 @@
         }
         .btn-generate { background-color: var(--primary); color: white; box-shadow: 0 4px 6px rgba(79, 70, 229, 0.2); }
         .btn-generate:hover { background-color: var(--primary-hover); transform: translateY(-1px); }
-        .btn-download { background-color: #10B981; color: white; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2); }
+        .btn-download { background-color: #10B981; color: white; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2); margin-bottom: 0; }
         .btn-download:hover { background-color: #059669; transform: translateY(-1px); }
         
         .preview-panel {
@@ -146,7 +146,7 @@
             background: white;
             box-shadow: 0 10px 20px rgba(0,0,0,0.08);
             max-width: 100%;
-            width: 180px; /* 默认预览大小，不影响保存尺寸 */
+            width: 180px;
             height: auto;
             border-radius: 8px;
             transition: transform 0.2s;
@@ -162,20 +162,16 @@
 </head>
 <body>
 
-<!-- 隐藏的 SVG 滤镜：用于生成手绘/粉笔毛糙边缘效果 -->
 <svg style="display: none;">
     <defs>
         <filter id="handDrawnFilter" x="-20%" y="-20%" width="140%" height="140%">
-            <!-- 生成分形噪声，用于模拟纸张纹理和笔触的不规则感 -->
             <feTurbulence id="svgTurbulence" type="fractalNoise" baseFrequency="0.15" numOctaves="3" result="noise" />
-            <!-- 使用噪声对源图像(文字)的边缘进行置换扭曲 -->
             <feDisplacementMap id="svgDisplacement" in="SourceGraphic" in2="noise" scale="5" xChannelSelector="R" yChannelSelector="G" />
         </filter>
     </defs>
 </svg>
 
 <div class="container">
-    <!-- 左侧：控制面板 -->
     <div class="panel">
         <h2>🛠️ 基础设置</h2>
         
@@ -266,11 +262,17 @@
         </div>
 
         <button class="btn btn-generate" onclick="generateImages()" style="margin-top: 15px;">强制刷新生成</button>
-        <button class="btn btn-download" onclick="downloadAll()" id="downloadBtn" style="display: none;">💾 批量保存高清原图</button>
-        <div id="statusMsg" class="help-text" style="color: #10B981; font-weight: bold; text-align: center;"></div>
+        
+        <div id="downloadArea" style="display: none; margin-top: 15px; background: #F9FAFB; padding: 15px; border-radius: 8px; border: 1px solid var(--border);">
+            <label class="toggle-label" style="font-size: 0.9rem; color: #4B5563; padding-top: 0; margin-bottom: 10px;">
+                <input type="checkbox" id="useZip">
+                打包成 ZIP 压缩包下载
+            </label>
+            <button class="btn btn-download" onclick="downloadAll()">💾 批量保存高清原图</button>
+            <div id="statusMsg" class="help-text" style="color: #10B981; font-weight: bold; text-align: center; margin-top: 10px;"></div>
+        </div>
     </div>
 
-    <!-- 右侧：预览面板 -->
     <div class="panel preview-panel">
         <h2 style="padding: 20px 20px 0 20px; border:none; margin:0;">👀 实时预览图</h2>
         <div class="help-text" style="padding: 0 20px;">所见即所得。调整左侧参数，这里会实时变化。（显示为缩略图，保存为高清大图）</div>
@@ -281,7 +283,7 @@
 <script>
     let debounceTimer;
 
-    // 分离文本，支持 Emoji
+    // 分离文本
     function splitText(text) {
         return Array.from(text);
     }
@@ -297,22 +299,21 @@
         document.getElementById('svgDisplacement').setAttribute('scale', scale);
         document.getElementById('svgTurbulence').setAttribute('baseFrequency', freq);
         
-        autoGenerate(); // 更新滤镜后重新渲染画布
+        autoGenerate(); 
     }
 
-    // 防抖自动生成，避免拖动滑块时卡顿
+    // 防抖自动生成
     function autoGenerate() {
-        // 更新加粗数值显示
         document.getElementById('valStroke').innerText = document.getElementById('strokeWidth').value;
         
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
             generateImages();
-        }, 50); // 50毫秒防抖，实现丝滑实时预览
+        }, 50); 
     }
 
     function generateImages() {
-        const text = document.getElementById('inputText').value.replace(/\n/g, ''); // 过滤回车
+        const text = document.getElementById('inputText').value.replace(/\n/g, ''); 
         const charsPerImg = parseInt(document.getElementById('charsPerImg').value) || 1;
         const textColor = document.getElementById('textColor').value;
         const bgColor = document.getElementById('bgColor').value;
@@ -324,7 +325,7 @@
         const extraStroke = parseInt(document.getElementById('strokeWidth').value) || 0;
         
         const container = document.getElementById('canvasContainer');
-        const downloadBtn = document.getElementById('downloadBtn');
+        const downloadArea = document.getElementById('downloadArea');
         const statusMsg = document.getElementById('statusMsg');
         
         container.innerHTML = '';
@@ -332,7 +333,7 @@
 
         if (!text) {
             container.innerHTML = '<div style="color:#9CA3AF; padding: 20px;">等待输入文字...</div>';
-            downloadBtn.style.display = 'none';
+            downloadArea.style.display = 'none';
             return;
         }
 
@@ -343,7 +344,7 @@
             groups.push(chars.slice(i, i + charsPerImg).join(''));
         }
 
-        groups.forEach((groupText, index) => {
+        groups.forEach((groupText) => {
             const canvas = document.createElement('canvas');
             canvas.width = width;
             canvas.height = height;
@@ -351,12 +352,9 @@
             
             const ctx = canvas.getContext('2d');
             
-            // 1. 绘制背景（背景不加滤镜，保持干净）
             ctx.fillStyle = bgColor;
             ctx.fillRect(0, 0, width, height);
             
-            // 2. 配置字体
-            // 基础字号计算逻辑
             const maxFontSizeByWidth = (width / groupText.length) * 0.85; 
             const maxFontSizeByHeight = height * 0.8;
             const fontSize = Math.min(maxFontSizeByWidth, maxFontSizeByHeight);
@@ -365,68 +363,93 @@
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             
-            // 3. 应用手绘滤镜 (仅对文字生效)
-            // 注意：依赖浏览器的 Canvas 支持，目前主流 Chrome, Edge, Safari 均支持 ctx.filter 绑定 SVG 滤镜
             if (isHandDrawn) {
                 ctx.filter = 'url(#handDrawnFilter)';
             } else {
                 ctx.filter = 'none';
             }
 
-            // 4. 绘制文字 (填充)
             ctx.fillStyle = textColor;
             ctx.fillText(groupText, width / 2, height / 2);
             
-            // 5. 如果需要加粗，使用 stroke 描边
             if (extraStroke > 0) {
                 ctx.strokeStyle = textColor;
                 ctx.lineWidth = extraStroke;
-                ctx.lineJoin = 'round'; // 圆润的边角，更像手写
+                ctx.lineJoin = 'round';
                 ctx.strokeText(groupText, width / 2, height / 2);
             }
 
-            // 绘制完成后，重置 filter 以免影响后续操作
             ctx.filter = 'none';
-            
             container.appendChild(canvas);
         });
 
         if (groups.length > 0) {
-            downloadBtn.style.display = 'block';
+            downloadArea.style.display = 'block';
         }
     }
 
-    // 批量下载，带有延迟以防止浏览器拦截
-    function downloadAll() {
+    // 处理批量下载与ZIP打包
+    async function downloadAll() {
         const canvases = document.querySelectorAll('.result-canvas');
         if (canvases.length === 0) return;
 
         const statusMsg = document.getElementById('statusMsg');
-        statusMsg.innerHTML = "打包保存中，请允许浏览器下载多张图片...";
+        const isZip = document.getElementById('useZip').checked;
+        const textPrefix = document.getElementById('inputText').value.substring(0, 2) || "文字";
 
-        canvases.forEach((canvas, index) => {
-            setTimeout(() => {
+        if (isZip) {
+            // ZIP 打包下载逻辑
+            statusMsg.innerHTML = "📦 正在打包 ZIP，请稍候...";
+            try {
+                const zip = new JSZip();
+                canvases.forEach((canvas, index) => {
+                    const fileIndex = (index + 1).toString().padStart(2, '0');
+                    const dataUrl = canvas.toDataURL('image/png', 1.0);
+                    // 移除 base64 的头部说明
+                    const base64Data = dataUrl.replace(/^data:image\/(png|jpg);base64,/, "");
+                    zip.file(`手绘文字_${textPrefix}_${fileIndex}.png`, base64Data, {base64: true});
+                });
+
+                const content = await zip.generateAsync({type:"blob"});
                 const link = document.createElement('a');
-                const fileIndex = (index + 1).toString().padStart(2, '0');
-                // 提取前两个字作为文件名的一部分
-                const textPrefix = document.getElementById('inputText').value.substring(0, 2);
-                link.download = `手绘文字_${textPrefix}_${fileIndex}.png`;
-                link.href = canvas.toDataURL('image/png', 1.0); // 导出最高质量的PNG
+                link.href = URL.createObjectURL(content);
+                link.download = `手绘文字_${textPrefix}_打包.zip`;
                 link.click();
                 
-                if (index === canvases.length - 1) {
-                    setTimeout(() => {
-                        statusMsg.innerHTML = "✅ 保存完成！请在浏览器下载记录中查看。";
-                        setTimeout(() => statusMsg.innerHTML = "", 5000);
-                    }, 500);
-                }
-            }, index * 400); // 间隔 400ms 防止被拦截
-        });
+                statusMsg.innerHTML = "✅ ZIP 压缩包下载完成！";
+            } catch (error) {
+                console.error(error);
+                statusMsg.innerHTML = "❌ ZIP 打包失败，请尝试取消勾选进行普通下载。";
+            }
+            
+            setTimeout(() => statusMsg.innerHTML = "", 5000);
+
+        } else {
+            // 普通逐张下载逻辑
+            statusMsg.innerHTML = "⬇️ 逐张保存中，请允许浏览器下载多张图片...";
+            
+            canvases.forEach((canvas, index) => {
+                // 间隔加大到 800ms，进一步防拦截
+                setTimeout(() => {
+                    const link = document.createElement('a');
+                    const fileIndex = (index + 1).toString().padStart(2, '0');
+                    link.download = `手绘文字_${textPrefix}_${fileIndex}.png`;
+                    link.href = canvas.toDataURL('image/png', 1.0); 
+                    link.click();
+                    
+                    if (index === canvases.length - 1) {
+                        setTimeout(() => {
+                            statusMsg.innerHTML = "✅ 保存完成！请在浏览器下载记录中查看。";
+                            setTimeout(() => statusMsg.innerHTML = "", 5000);
+                        }, 800);
+                    }
+                }, index * 800); 
+            });
+        }
     }
 
     // 页面加载完成后自动初始化渲染一次
     window.onload = () => {
-        // 等待字体加载稍微延迟一下渲染
         setTimeout(autoGenerate, 200);
     };
 </script>
