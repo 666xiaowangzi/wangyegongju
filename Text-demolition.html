@@ -134,6 +134,17 @@
         .btn-download:hover { background-color: #059669; transform: translateY(-1px); }
         .btn-download:disabled { background-color: #9CA3AF; cursor: not-allowed; box-shadow: none; }
         
+        /* 加载更多按钮样式 */
+        .btn-loadmore { 
+            background-color: #F3F4F6; 
+            color: #4B5563; 
+            border: 2px dashed #D1D5DB; 
+            margin: 0 20px 20px 20px;
+            width: calc(100% - 40px);
+            display: none;
+        }
+        .btn-loadmore:hover { background-color: #E5E7EB; border-color: #9CA3AF; }
+
         .preview-panel {
             background: var(--bg);
             box-shadow: none;
@@ -146,7 +157,8 @@
             justify-content: flex-start;
             margin-top: 15px;
         }
-        canvas {
+        /* 预览图片样式 */
+        .result-img {
             background: white;
             box-shadow: 0 10px 20px rgba(0,0,0,0.08);
             max-width: 100%;
@@ -154,14 +166,28 @@
             height: auto;
             border-radius: 8px;
             transition: transform 0.2s;
+            /* 提示用户可以交互 */
+            cursor: pointer; 
+            /* 防止手机端点击时的高亮色块 */
+            -webkit-tap-highlight-color: transparent; 
         }
-        canvas:hover { transform: scale(1.02); }
-        .help-text { font-size: 0.8rem; color: #6B7280; margin-top: 6px; }
-        .warning-text { color: #EF4444; font-weight: bold; margin-top: 10px; display: none; }
+        .result-img:hover { transform: scale(1.02); }
+        .help-text { font-size: 0.8rem; color: #6B7280; margin-top: 6px; line-height: 1.4; }
+        
+        .notice-banner {
+            background: #EFF6FF;
+            border: 1px solid #BFDBFE;
+            color: #1D4ED8;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            margin-top: 10px;
+            font-weight: bold;
+        }
 
         @media (max-width: 800px) {
             .container { grid-template-columns: 1fr; }
-            canvas { width: 45%; min-width: 120px; }
+            .result-img { width: 45%; min-width: 120px; }
         }
     </style>
 </head>
@@ -250,34 +276,72 @@
         <button class="btn btn-generate" onclick="generateImages()" style="margin-top: 15px;">强制刷新生成</button>
         
         <div id="downloadArea" style="display: none; margin-top: 15px; background: #F9FAFB; padding: 15px; border-radius: 8px; border: 1px solid var(--border);">
-            <label class="toggle-label" style="font-size: 0.9rem; color: #4B5563; padding-top: 0; margin-bottom: 10px;">
-                <input type="checkbox" id="useZip">
+            <label class="toggle-label" style="font-size: 0.95rem; color: #1F2937; padding-top: 0; margin-bottom: 8px;">
+                <input type="checkbox" id="useZip" onchange="toggleIntervalSetting()">
                 打包成 ZIP 压缩包下载
             </label>
-            <button class="btn btn-download" id="dlButton" onclick="downloadAll()">💾 保存所有原图</button>
+            
+            <div id="intervalSetting" style="margin-bottom: 12px; padding: 10px; background: #fff; border-radius: 6px; border: 1px solid #E5E7EB;">
+                <label style="font-size: 0.85rem; font-weight: bold; color: #4B5563; display: block; margin-bottom: 6px;">
+                    普通多图下载间隔 (毫秒)
+                </label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="number" id="downloadInterval" style="width: 100px; padding: 6px; font-size: 0.9rem;" min="0" step="100">
+                    <span style="font-size: 0.8rem; color: #6B7280;">(1秒 = 1000毫秒)</span>
+                </div>
+                <div class="help-text" style="color: #D97706; margin-top: 8px;">
+                    💡 备注：多图下载易被拦截，已为您提供自动延迟防拦截。若仍失败，请长按右侧预览图保存，或使用 ZIP 打包。<br>
+                    <span id="deviceType" style="font-weight:bold; color: #4F46E5;"></span>
+                </div>
+            </div>
+
+            <button class="btn btn-download" id="dlButton" onclick="downloadAll()">💾 保存所有原图 (电脑/安卓推荐)</button>
             <div id="statusMsg" class="help-text" style="color: #10B981; font-weight: bold; text-align: center; margin-top: 10px;"></div>
         </div>
     </div>
 
     <div class="panel preview-panel">
         <h2 style="padding: 20px 20px 0 20px; border:none; margin:0;">👀 实时预览图</h2>
-        <div class="help-text" style="padding: 0 20px;">
-            提示：为防止浏览器卡死，这里最多只预览前 <span style="color:var(--primary);font-weight:bold;">30</span> 张图。下载时会自动生成所有图片。
+        
+        <div style="padding: 0 20px;">
+            <div class="notice-banner">📱 手机端：可直接长按下方任意图片，选择“保存到相册”。(已为您呈现高清原图画质)</div>
+            <div class="help-text" style="margin-top: 10px;">所见即所得。调整左侧参数，这里会实时变化。</div>
         </div>
-        <div id="previewWarning" class="warning-text" style="padding: 0 20px;">⚠️ 文字较多，仅展示部分预览。请使用 ZIP 打包下载全部图片以防浏览器拦截。</div>
+        
         <div class="canvas-container" style="padding: 0 20px 20px 20px;" id="canvasContainer"></div>
+        
+        <button id="btnLoadMore" class="btn btn-loadmore" onclick="loadMorePreview()">⏬ 加载更多图片</button>
     </div>
 </div>
 
 <script>
     let debounceTimer;
-    // 预览上限：DOM 中最多渲染这么多张
-    const MAX_PREVIEW_LIMIT = 30;
+    // 每次加载的批次数量
+    const BATCH_SIZE = 30; 
+    // 记录当前已渲染到第几张
+    let currentRenderIndex = 0; 
 
-    // 分离文本
+    function initDeviceSettings() {
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const intervalInput = document.getElementById('downloadInterval');
+        const deviceTypeSpan = document.getElementById('deviceType');
+        
+        if (isMobile) {
+            intervalInput.value = 1000;
+            deviceTypeSpan.innerText = '已识别为手机端，建议延迟保持 1000ms 左右。';
+        } else {
+            intervalInput.value = 200;
+            deviceTypeSpan.innerText = '已识别为电脑端，可设为 200ms 加快速度。';
+        }
+    }
+
+    function toggleIntervalSetting() {
+        const isZip = document.getElementById('useZip').checked;
+        document.getElementById('intervalSetting').style.display = isZip ? 'none' : 'block';
+    }
+
     function splitText(text) { return Array.from(text); }
 
-    // 实时更新 SVG 滤镜参数
     function updateFilters() {
         const scale = document.getElementById('distortionScale').value;
         const freq = document.getElementById('noiseFreq').value;
@@ -288,20 +352,17 @@
         autoGenerate(); 
     }
 
-    // 防抖自动生成
     function autoGenerate() {
         const textVal = document.getElementById('inputText').value;
         document.getElementById('charCount').innerText = `${textVal.length}/500`;
         document.getElementById('valStroke').innerText = document.getElementById('strokeWidth').value;
         
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => { generateImages(); }, 300); // 增加一点防抖延迟，对长文本更友好
+        debounceTimer = setTimeout(() => { generateImages(); }, 300); 
     }
 
-    // 核心绘制逻辑，封装以便在预览和下载时复用
     function drawOnCanvas(canvas, groupText, config) {
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        
         ctx.fillStyle = config.bgColor;
         ctx.fillRect(0, 0, config.width, config.height);
         
@@ -328,7 +389,6 @@
         ctx.filter = 'none';
     }
 
-    // 提取当前配置
     function getConfig() {
         return {
             textColor: document.getElementById('textColor').value,
@@ -341,16 +401,16 @@
         };
     }
 
-    // 仅用于生成“预览图”
     function generateImages() {
         const text = document.getElementById('inputText').value.replace(/\n/g, ''); 
         const charsPerImg = parseInt(document.getElementById('charsPerImg').value) || 1;
         const container = document.getElementById('canvasContainer');
         const downloadArea = document.getElementById('downloadArea');
-        const previewWarning = document.getElementById('previewWarning');
+        const btnLoadMore = document.getElementById('btnLoadMore');
         
         container.innerHTML = '';
-        previewWarning.style.display = 'none';
+        btnLoadMore.style.display = 'none';
+        currentRenderIndex = 0; // 重置进度
 
         if (!text) {
             container.innerHTML = '<div style="color:#9CA3AF; padding: 20px;">等待输入文字...</div>';
@@ -364,54 +424,70 @@
             groups.push(chars.slice(i, i + charsPerImg).join(''));
         }
 
-        const config = getConfig();
-        const totalImages = groups.length;
-        
-        // 限制 DOM 预览数量
-        const previewGroups = groups.slice(0, MAX_PREVIEW_LIMIT);
-        
-        if (totalImages > MAX_PREVIEW_LIMIT) {
-            previewWarning.style.display = 'block';
-            previewWarning.innerText = `⚠️ 共计 ${totalImages} 张图，已隐藏 ${totalImages - MAX_PREVIEW_LIMIT} 张以防卡顿。打包下载时会获取全部。`;
-            document.getElementById('useZip').checked = true; // 强制建议勾选ZIP
-        }
-
-        previewGroups.forEach((groupText) => {
-            const canvas = document.createElement('canvas');
-            canvas.width = config.width;
-            canvas.height = config.height;
-            drawOnCanvas(canvas, groupText, config);
-            container.appendChild(canvas);
-        });
+        window.__currentGroups = groups;
 
         if (groups.length > 0) {
             downloadArea.style.display = 'block';
+            loadMorePreview(); // 首次渲染第一批
         }
-        
-        // 把分组数据绑定到全局供下载使用
-        window.__currentGroups = groups;
     }
 
-    // 后台分批处理生成图片 (利用 Promise 防止主线程卡死)
+    // 分批次渲染为真正的 <img> 标签
+    function loadMorePreview() {
+        const container = document.getElementById('canvasContainer');
+        const btnLoadMore = document.getElementById('btnLoadMore');
+        const groups = window.__currentGroups;
+        const config = getConfig();
+
+        // 计算当前批次的结束索引
+        const endIndex = Math.min(currentRenderIndex + BATCH_SIZE, groups.length);
+        
+        for (let i = currentRenderIndex; i < endIndex; i++) {
+            // 使用临时 Canvas 绘图
+            const canvas = document.createElement('canvas');
+            canvas.width = config.width;
+            canvas.height = config.height;
+            drawOnCanvas(canvas, groups[i], config);
+            
+            // 转化为 <img>，这样移动端就能直接长按保存了
+            const img = document.createElement('img');
+            img.className = 'result-img';
+            img.src = canvas.toDataURL('image/png', 1.0);
+            img.alt = `预览图 ${i + 1}`;
+            
+            container.appendChild(img);
+            
+            // 立即释放 Canvas 内存
+            canvas.width = 0;
+            canvas.height = 0;
+        }
+
+        currentRenderIndex = endIndex;
+
+        // 如果还没渲染完，显示加载更多按钮
+        if (currentRenderIndex < groups.length) {
+            btnLoadMore.style.display = 'block';
+            btnLoadMore.innerText = `⏬ 加载更多图片 (已展示 ${currentRenderIndex} / ${groups.length})`;
+        } else {
+            btnLoadMore.style.display = 'none';
+        }
+    }
+
     function generateDataUrlAsync(groupText, config) {
         return new Promise((resolve) => {
-            // setTimeout 释放主线程，防止 UI 卡死
             setTimeout(() => {
                 const canvas = document.createElement('canvas');
                 canvas.width = config.width;
                 canvas.height = config.height;
                 drawOnCanvas(canvas, groupText, config);
                 const dataUrl = canvas.toDataURL('image/png', 1.0);
-                
-                // 【极度重要】立刻清理画布释放内存
                 canvas.width = 0;
                 canvas.height = 0; 
                 resolve(dataUrl);
-            }, 10); // 10ms 呼吸时间
+            }, 10); 
         });
     }
 
-    // 核心下载逻辑
     async function downloadAll() {
         const groups = window.__currentGroups;
         if (!groups || groups.length === 0) return;
@@ -421,23 +497,21 @@
         const config = getConfig();
         const statusMsg = document.getElementById('statusMsg');
         const dlButton = document.getElementById('dlButton');
+        const userDelay = parseInt(document.getElementById('downloadInterval').value) || 200;
 
-        // 如果要下很多张且没选ZIP，阻拦他
-        if (!isZip && groups.length > 20) {
-            alert(`数量过多 (${groups.length}张)，逐张下载会被浏览器拦截。请勾选“打包成 ZIP”！`);
+        if (!isZip && groups.length > 30) {
+            alert(`数量极多 (${groups.length}张)，逐张下载大概率会导致浏览器崩溃或被拦截拦截。已强制为您勾选“打包成 ZIP”！`);
             document.getElementById('useZip').checked = true;
+            toggleIntervalSetting();
             return;
         }
 
-        // 锁定按钮防止重复点击
         dlButton.disabled = true;
 
         if (isZip) {
             statusMsg.innerHTML = "📦 后台拼命生成和压缩中，请不要关闭页面...";
             try {
                 const zip = new JSZip();
-                
-                // 使用 for 循环结合 await，一张一张生成，不让内存暴涨
                 for (let i = 0; i < groups.length; i++) {
                     const fileIndex = (i + 1).toString().padStart(3, '0');
                     statusMsg.innerHTML = `📦 正在生成第 ${i+1}/${groups.length} 张...`;
@@ -446,7 +520,6 @@
                     const base64Data = dataUrl.replace(/^data:image\/(png|jpg);base64,/, "");
                     zip.file(`手绘文字_${textPrefix}_${fileIndex}.png`, base64Data, {base64: true});
                 }
-
                 statusMsg.innerHTML = "📦 图片生成完毕，正在打包 ZIP (这可能需要几秒钟)...";
                 const content = await zip.generateAsync({type:"blob"});
                 
@@ -455,18 +528,14 @@
                 link.download = `手绘文字_${textPrefix}_打包.zip`;
                 link.click();
                 
-                // 释放 blob 内存
                 setTimeout(() => URL.revokeObjectURL(link.href), 5000); 
                 statusMsg.innerHTML = "✅ ZIP 压缩包下载完成！";
-
             } catch (error) {
                 console.error(error);
                 statusMsg.innerHTML = "❌ 打包失败，内容可能过多。";
             }
         } else {
-            statusMsg.innerHTML = "⬇️ 逐张后台生成并保存中，请允许浏览器下载...";
-            
-            // 逐个生成并下载
+            statusMsg.innerHTML = "⬇️ 逐张后台生成并保存中，请允许浏览器多文件下载...";
             for (let i = 0; i < groups.length; i++) {
                 const fileIndex = (i + 1).toString().padStart(3, '0');
                 const dataUrl = await generateDataUrlAsync(groups[i], config);
@@ -476,18 +545,19 @@
                 link.href = dataUrl;
                 link.click();
                 
-                // 强制暂停 800ms 防止浏览器拦截弹出
-                await new Promise(r => setTimeout(r, 800));
+                await new Promise(r => setTimeout(r, userDelay));
             }
             statusMsg.innerHTML = "✅ 全部保存完成！";
         }
 
-        // 恢复按钮状态
         dlButton.disabled = false;
         setTimeout(() => statusMsg.innerHTML = "", 5000);
     }
 
-    window.onload = () => { setTimeout(autoGenerate, 200); };
+    window.onload = () => { 
+        initDeviceSettings(); 
+        setTimeout(autoGenerate, 200); 
+    };
 </script>
 
 </body>
