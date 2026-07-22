@@ -1,0 +1,12 @@
+{
+  "name": "PDF 超级分割工具 (小王子)",
+  "short_name": "PDF分割",
+  "description": "极致轻便的 PDF 在线网格分割工具，支持离线使用",
+  "start_url": "./PDF-Grid-Cutter-Pro.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#4f46e5",
+  "lang": "zh-CN",
+  "icons": []
+}
